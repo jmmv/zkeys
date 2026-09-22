@@ -1,0 +1,95 @@
+.\" zkeys
+.\" Copyright 2026 Julio Merino.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions are
+.\" met:
+.\"
+.\" * Redistributions of source code must retain the above copyright
+.\"   notice, this list of conditions and the following disclaimer.
+.\" * Redistributions in binary form must reproduce the above copyright
+.\"   notice, this list of conditions and the following disclaimer in the
+.\"   documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+.\" "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+.\" LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+.\" A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+.\" OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+.\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+.\" LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+.\" DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+.\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+.\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+.\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.Dd September 13, 2026
+.Dt ZKEYS 8
+.Os
+.Sh NAME
+.Nm zkeys
+.Nd retrieve secrets from a zkeys service
+.Sh SYNOPSIS
+.Nm
+.Cm get-key
+.Op Fl -config-file Ar file
+.Ar name
+.Nm
+.Cm help
+.Op Ar command
+.Nm
+.Cm version
+.Sh DESCRIPTION
+.Nm
+retrieves secrets from a zkeys service and is designed for integration with
+ZFS deployments to securely unlock pools or file systems without keeping the
+key stored on the same machine.
+.Pp
+Note that, by design, this client does
+.Em not
+support administrative key operations such as key unlocking.
+This is to prevent mistakes resulting in ever storing privileged credentials on
+the machine as that would defeat the purpose of the remote service's auto-key
+locking features.
+.Ss The get-key command
+The get-key command retrieves the secret for the key named by
+.Ar name .
+The name must identify a key in the configuration file.
+The client authenticates to the service with the key's configured identifier
+and remote password.
+It prepends the configured local secret to the service response and writes the
+result to standard output, followed by a newline.
+.Pp
+The following option is supported:
+.Bl -tag -width XXXX
+.It Fl -config-file Ar file
+Path to the configuration file.
+.Pp
+Default:
+.Pa @PREFIX@/etc/zkeys.toml
+.El
+.Ss The help command
+The help command prints command-line usage information.
+If
+.Ar command
+is given, it prints usage information for that command.
+.Ss The version command
+The version command prints the name of the package and its version to standard
+output.
+This command always exits successfully.
+.Sh FILES
+.Bl -tag -width XXXX
+.It Pa @PREFIX@/etc/zkeys.toml
+Default configuration file.
+See
+.Xr zkeys.toml 5
+for its format.
+.El
+.Sh SEE ALSO
+.Xr zkeys.toml 5
+.Sh AUTHORS
+The
+.Nm
+package was developed by
+.An Julio Merino
+.Aq julio@meroh.net .

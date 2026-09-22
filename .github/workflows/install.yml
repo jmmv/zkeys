@@ -1,0 +1,24 @@
+# ZKeys
+# Copyright 2025 Julio Merino
+
+name: install
+
+on: push
+
+jobs:
+    install:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - name: Install
+              env:
+                  PREFIX: ${{ runner.temp }}/zkeys-prefix
+              run: make install PREFIX="${PREFIX}"
+            - name: Verify installed layout
+              env:
+                  PREFIX: ${{ runner.temp }}/zkeys-prefix
+              run: |
+                  test -x "${PREFIX}/bin/zkeys"
+                  test -f "${PREFIX}/share/man/man5/zkeys.toml.5"
+                  test -f "${PREFIX}/share/man/man8/zkeys.8"
+                  test "$(find "${PREFIX}" -type f | wc -l)" -eq 3

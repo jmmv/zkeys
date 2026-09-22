@@ -1,0 +1,42 @@
+[package]
+name = "zkeys"
+version = "0.0.0"
+publish = false
+license = "BSD-2-Clause"
+authors = ["Julio Merino <julio@meroh.net>"]
+categories = ["command-line-utilities"]
+keywords = ["zkeys", "secrets", "key-management", "secret-management", "cli"]
+description = "ZKeys CLI client"
+homepage = "https://zkeys.jmmv.dev/"
+repository = "https://github.com/jmmv/zkeys"
+readme = "README.md"
+edition = "2024"
+
+[lints.rust]
+anonymous_parameters = "warn"
+bad_style = "warn"
+missing_docs = "warn"
+unused = "warn"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+unused_qualifications = "warn"
+unsafe_code = "warn"
+
+[lints.clippy]
+await_holding_refcell_ref = "allow"
+collapsible_else_if = "allow"
+
+[dependencies]
+anyhow = "1"
+getoptsargs = "0.4"
+reqwest = "0.12"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["full", "rt-multi-thread"] }
+toml = "0.9"
+url = { version = "2", features = ["serde"] }
+uuid = { version = "1.16", default-features = false, features = ["serde", "std"] }
+
+[dev-dependencies]
+assert_cmd = "2"
+axum = "0.8"
+tempfile = "3"
