@@ -10,6 +10,10 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
+            - name: Install mtree
+              run: |
+                  sudo apt update
+                  sudo apt install --yes mtree-netbsd
             - name: Install
               env:
                   PREFIX: ${{ runner.temp }}/zkeys-prefix
@@ -17,8 +21,4 @@ jobs:
             - name: Verify installed layout
               env:
                   PREFIX: ${{ runner.temp }}/zkeys-prefix
-              run: |
-                  test -x "${PREFIX}/sbin/zkeys"
-                  test -f "${PREFIX}/share/man/man5/zkeys.toml.5"
-                  test -f "${PREFIX}/share/man/man8/zkeys.8"
-                  test "$(find "${PREFIX}" -type f | wc -l)" -eq 3
+              run: mtree -f install.mtree -p "${PREFIX}"
