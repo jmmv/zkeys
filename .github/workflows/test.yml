@@ -1,7 +1,7 @@
 # ZKeys
 # Copyright 2026 Julio Merino
 
-name: Test
+name: test
 
 on: push
 
