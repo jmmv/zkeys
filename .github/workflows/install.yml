@@ -22,3 +22,11 @@ jobs:
               env:
                   PREFIX: ${{ runner.temp }}/zkeys-prefix
               run: mtree -f install.mtree -p "${PREFIX}"
+            - name: Install with DESTDIR
+              env:
+                  DESTDIR: ${{ runner.temp }}/zkeys-prefix
+              run: make install DESTDIR="${DESTDIR}"
+            - name: Verify DESTDIR installed layout
+              env:
+                  DESTDIR: ${{ runner.temp }}/zkeys-prefix
+              run: mtree -f install.mtree -p "${DESTDIR}/usr/local"
