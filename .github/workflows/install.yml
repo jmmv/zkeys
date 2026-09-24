@@ -18,7 +18,7 @@ jobs:
               env:
                   PREFIX: ${{ runner.temp }}/zkeys-prefix
               run: |
-                  test -x "${PREFIX}/bin/zkeys"
+                  test -x "${PREFIX}/sbin/zkeys"
                   test -f "${PREFIX}/share/man/man5/zkeys.toml.5"
                   test -f "${PREFIX}/share/man/man8/zkeys.8"
                   test "$(find "${PREFIX}" -type f | wc -l)" -eq 3

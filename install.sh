@@ -34,8 +34,8 @@ install() {
     command install "${@}"
 }
 
-install -m 755 -d "${PREFIX}/bin"
-install -m 755 target/release/zkeys "${PREFIX}/bin/zkeys"
+install -m 755 -d "${PREFIX}/sbin"
+install -m 755 target/release/zkeys "${PREFIX}/sbin/zkeys"
 install -m 755 -d "${PREFIX}/share/man/man5"
 install -m 644 man/zkeys.toml.5 "${PREFIX}/share/man/man5/zkeys.toml.5"
 install -m 755 -d "${PREFIX}/share/man/man8"
