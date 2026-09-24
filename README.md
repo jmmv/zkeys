@@ -25,14 +25,15 @@ Visit <https://zkeys.jmmv.dev/> for more details on the product.
 With a Rust toolchain and GNU Make installed, build and install the client with:
 
 ```sh
-make install
+$ make
+$ sudo make install
 ```
 
 This installs to `/usr/local` by default.  To use another prefix, pass it to
 `make`:
 
 ```sh
-make install PREFIX=/opt/local
+$ make install PREFIX=/opt/local
 ```
 
 If you are on FreeBSD (the primary target of this project), make sure to use

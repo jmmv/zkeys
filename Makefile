@@ -32,7 +32,7 @@ SRCS := Cargo.toml Cargo.lock rust-toolchain.toml \
     $(shell find "src" "tests" \( -name "*.rs" -o -name "Cargo.*" \) -and -not -path "./target/*")
 
 .PHONY: all
-all: debug manpages
+all: release manpages
 
 .PHONY: target/stamp.prefix.new
 target/stamp.prefix.new:
@@ -64,7 +64,7 @@ target/zkeys.8: man/zkeys.8.in target/stamp.prefix
 	sed -e 's|@PREFIX@|$(PREFIX)|g' "$<" >"$@"
 
 .PHONY: install
-install: release manpages
+install: all
 	sh "./install.sh" "$(PREFIX)"
 
 .PHONY: test
