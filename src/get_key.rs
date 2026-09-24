@@ -24,10 +24,22 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-//! Command-line interface for the ZKeys service.
+//! `get-key` command implementation.
 
-mod config;
-pub use config::Config;
-mod get_key;
-pub use get_key::get_key;
-mod service;
+use crate::Config;
+use crate::service::Service;
+use std::io;
+
+/// Retrieves `name` from the configured service and writes it to standard output.
+pub async fn get_key(config: Config, name: &str) -> io::Result<()> {
+    let service = Service::new(config.service_url)?;
+
+    let key = config.keys.get(name).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::NotFound, format!("No key named {name} is configured"))
+    })?;
+
+    let result = service.get_key_secret(key.id, &key.remote_password).await?;
+    println!("{}{}", key.local_secret, result.secret);
+
+    Ok(())
+}
