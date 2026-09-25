@@ -41,6 +41,7 @@ fn default_service_url() -> Url {
 
 /// Describes a key that can be retrieved from the service.
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct Key {
     /// Unique identifier used by the service.
     pub id: Uuid,
@@ -54,6 +55,7 @@ pub struct Key {
 
 /// Describes the zkeys client configuration.
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct Config {
     /// Base URL of the zkeys service.
     #[serde(default = "default_service_url")]
@@ -64,9 +66,116 @@ pub struct Config {
 }
 
 impl Config {
+    /// Parses a configuration file in `content`.
+    fn parse_from_str(content: &str) -> io::Result<Self> {
+        toml::from_str(content).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    }
+
     /// Parses a configuration file at `path`.
     pub fn parse<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let content = fs::read_to_string(path.as_ref())?;
-        toml::from_str(&content).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        Self::parse_from_str(&content)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_from_str_defaults() {
+        let config = Config::parse_from_str("[keys]").unwrap();
+
+        assert_eq!(
+            Config {
+                service_url: Url::parse("https://zkeys.jmmv.dev/").unwrap(),
+                keys: HashMap::default(),
+            },
+            config
+        );
+    }
+
+    #[test]
+    fn test_parse_from_str_explicit() {
+        const KEY_ID_1: &str = "00000001-0001-0001-0001-000000000001";
+        const KEY_ID_2: &str = "00000002-0002-0002-0002-000000000002";
+
+        let mut keys = HashMap::default();
+        keys.insert(
+            "first".to_owned(),
+            Key {
+                id: Uuid::parse_str(KEY_ID_1).unwrap(),
+                remote_password: "remote-password-1".to_owned(),
+                local_secret: "local-secret-1".to_owned(),
+            },
+        );
+        keys.insert(
+            "second".to_owned(),
+            Key {
+                id: Uuid::parse_str(KEY_ID_2).unwrap(),
+                remote_password: "remote-password-2".to_owned(),
+                local_secret: "local-secret-2".to_owned(),
+            },
+        );
+
+        let config = Config::parse_from_str(&format!(
+            r#"
+service_url = "https://example.com/api/"
+
+[keys.first]
+id = "{KEY_ID_1}"
+remote_password = "remote-password-1"
+local_secret = "local-secret-1"
+
+[keys.second]
+id = "{KEY_ID_2}"
+remote_password = "remote-password-2"
+local_secret = "local-secret-2"
+"#
+        ))
+        .unwrap();
+
+        assert_eq!(
+            Config { service_url: Url::parse("https://example.com/api/").unwrap(), keys },
+            config
+        );
+    }
+
+    #[test]
+    fn test_parse_reads_configuration_file() {
+        let file = NamedTempFile::new().unwrap();
+        fs::write(
+            file.path(),
+            r#"
+service_url = "https://example.com/api/"
+
+[keys]
+"#,
+        )
+        .unwrap();
+
+        let config = Config::parse(file.path()).unwrap();
+        assert_eq!(Url::parse("https://example.com/api/").unwrap(), config.service_url);
+    }
+
+    #[test]
+    fn test_parse_reports_missing_file() {
+        let file = NamedTempFile::new().unwrap();
+        fs::remove_file(file.path()).unwrap();
+
+        let error = Config::parse(file.path()).err().unwrap();
+
+        assert_eq!(io::ErrorKind::NotFound, error.kind());
+    }
+
+    #[test]
+    fn test_parse_reports_malformed_configuration() {
+        let file = NamedTempFile::new().unwrap();
+        fs::write(file.path(), "not valid TOML").unwrap();
+
+        let error = Config::parse(file.path()).err().unwrap();
+
+        assert_eq!(io::ErrorKind::InvalidData, error.kind());
     }
 }
