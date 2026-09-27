@@ -26,11 +26,12 @@
 
 //! Configuration file support.
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, de};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::time::Duration;
 use url::Url;
 use uuid::Uuid;
 
@@ -39,8 +40,19 @@ fn default_service_url() -> Url {
     Url::parse("https://zkeys.jmmv.dev/").unwrap()
 }
 
+/// Returns the default interval to use when the service does not provide one.
+fn default_key_refresh_period() -> Duration {
+    Duration::from_secs(300)
+}
+
+/// Deserializes a human-readable duration.
+fn deserialize_duration<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Duration, D::Error> {
+    let raw = String::deserialize(deserializer)?;
+    humantime::parse_duration(&raw).map_err(de::Error::custom)
+}
+
 /// Describes a key that can be retrieved from the service.
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct Key {
     /// Unique identifier used by the service.
@@ -57,6 +69,10 @@ pub struct Key {
 #[derive(Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct Config {
+    /// Interval to use when the service does not provide one.
+    #[serde(default = "default_key_refresh_period", deserialize_with = "deserialize_duration")]
+    pub default_key_refresh_period: Duration,
+
     /// Base URL of the zkeys service.
     #[serde(default = "default_service_url")]
     pub service_url: Url,
@@ -91,6 +107,7 @@ mod tests {
             Config {
                 service_url: Url::parse("https://zkeys.jmmv.dev/").unwrap(),
                 keys: HashMap::default(),
+                default_key_refresh_period: default_key_refresh_period(),
             },
             config
         );
@@ -122,6 +139,7 @@ mod tests {
         let config = Config::parse_from_str(&format!(
             r#"
 service_url = "https://example.com/api/"
+default_key_refresh_period = "2d"
 
 [keys.first]
 id = "{KEY_ID_1}"
@@ -137,7 +155,11 @@ local_secret = "local-secret-2"
         .unwrap();
 
         assert_eq!(
-            Config { service_url: Url::parse("https://example.com/api/").unwrap(), keys },
+            Config {
+                service_url: Url::parse("https://example.com/api/").unwrap(),
+                default_key_refresh_period: Duration::from_secs(2 * 24 * 60 * 60),
+                keys
+            },
             config
         );
     }

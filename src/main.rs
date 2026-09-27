@@ -81,6 +81,29 @@ async fn get_key_main(_app_matches: Matches, command_matches: Matches) -> Result
     Ok(0)
 }
 
+/// Adds the options and arguments for the `keep-alive` command.
+fn keep_alive_setup(builder: CommandBuilder) -> CommandBuilder {
+    let paths = Paths::default();
+    builder
+        .optopt(
+            "",
+            "config-file",
+            &format!("path to the configuration file (default: {})", paths.config_file.display()),
+            "FILE",
+        )
+        .trailarg("name", 0, usize::MAX, "names of the keys to keep alive (default: all)")
+}
+
+/// Runs the `keep-alive` command.
+async fn keep_alive_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    let paths = Paths::default().with_overrides(&command_matches);
+    let config = Config::parse(&paths.config_file).with_context(|| {
+        format!("Failed to load configuration file {}", paths.config_file.display())
+    })?;
+    keep_alive(config, command_matches.arg_trail()).await?;
+    Ok(0)
+}
+
 /// Configures the command-line application and its subcommands.
 fn app_setup(builder: Builder) -> Builder {
     builder
@@ -88,6 +111,7 @@ fn app_setup(builder: Builder) -> Builder {
         .homepage(env!("CARGO_PKG_HOMEPAGE"))
         .manpage(env!("CARGO_BIN_NAME"), "8")
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)
+        .cmd_async("keep-alive", "periodically keep keys alive", keep_alive_setup, keep_alive_main)
 }
 
 tokio_app!("zkeys", app_setup, tokio_command_dispatcher);

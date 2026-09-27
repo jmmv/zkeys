@@ -27,7 +27,9 @@
 //! REST client for the zkeys service.
 
 use reqwest::StatusCode;
+use std::future::Future;
 use std::io;
+use std::time::Duration;
 use url::Url;
 use uuid::Uuid;
 
@@ -46,13 +48,30 @@ pub(crate) struct KeySecret {
     pub(crate) secret: String,
 }
 
+/// Result of refreshing a key.
+pub(crate) enum KeepAliveResult {
+    /// The key no longer exists in the service.
+    Deleted,
+
+    /// The key was refreshed, with an optional recommended refresh period.
+    Refreshed(Option<Duration>),
+}
+
 /// Interface to the zkeys service.
 pub(crate) trait Service {
     /// Retrieves a key secret identified by `key_id` using `password`.
     async fn get_key_secret(&self, key_id: Uuid, password: &str) -> io::Result<KeySecret>;
+
+    /// Refreshes the last-access timestamp of a key.
+    fn keep_alive(
+        &self,
+        key_id: Uuid,
+        password: &str,
+    ) -> impl Future<Output = io::Result<KeepAliveResult>> + Send;
 }
 
 /// HTTP client for the zkeys service.
+#[derive(Clone)]
 pub(crate) struct HttpService {
     /// Service API root URL.
     base_url: Url,
@@ -107,23 +126,89 @@ impl Service for HttpService {
 
         Ok(KeySecret { secret })
     }
+
+    async fn keep_alive(&self, key_id: Uuid, password: &str) -> io::Result<KeepAliveResult> {
+        let response = self
+            .client
+            .get(self.make_url(&format!("api/v1/keys/{}/keepalive", key_id)))
+            .query(&[("password", password)])
+            .send()
+            .await
+            .map_err(reqwest_error_to_io_error)?;
+
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(KeepAliveResult::Deleted);
+        }
+
+        if response.status() != StatusCode::OK {
+            let status = response.status();
+            let text = response.text().await.map_err(reqwest_error_to_io_error)?;
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Service returned HTTP {}: {}", status, text),
+            ));
+        }
+
+        let refresh_period = response
+            .headers()
+            .get("X-Key-Refresh-Period-Seconds")
+            .map(|value| -> io::Result<Duration> {
+                let value = value.to_str().map_err(|error| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Invalid key refresh period header: {error}"),
+                    )
+                })?;
+                let seconds = value.parse::<u64>().map_err(|error| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Invalid key refresh period header {value:?}: {error}"),
+                    )
+                })?;
+                Ok(Duration::from_secs(seconds))
+            })
+            .transpose()?;
+
+        Ok(KeepAliveResult::Refreshed(refresh_period))
+    }
 }
 
 #[cfg(test)]
 pub(crate) mod testutils {
-    use super::{KeySecret, Service};
-    use std::cell::RefCell;
+    use super::{KeepAliveResult, KeySecret, Service};
     use std::collections::VecDeque;
     use std::io;
+    use std::sync::{Arc, Mutex};
     use uuid::Uuid;
 
     /// Mapping of a `get_key` request to the mock response.
     type GetKeySecretMock = ((Uuid, String), io::Result<KeySecret>);
+    type KeepAliveMock = ((Uuid, String), io::Result<KeepAliveResult>);
+
+    /// Shared state for a mock service.
+    #[derive(Default)]
+    struct MockServiceState {
+        get_key_secret: Mutex<VecDeque<GetKeySecretMock>>,
+        keep_alive: Mutex<VecDeque<KeepAliveMock>>,
+    }
+
+    impl Drop for MockServiceState {
+        fn drop(&mut self) {
+            assert!(
+                self.get_key_secret.get_mut().unwrap().is_empty(),
+                "Mock requests not fully consumed"
+            );
+            assert!(
+                self.keep_alive.get_mut().unwrap().is_empty(),
+                "Mock requests not fully consumed"
+            );
+        }
+    }
 
     /// Service implementation that returns predefined results for expected requests.
-    #[derive(Default)]
+    #[derive(Clone, Default)]
     pub(crate) struct MockService {
-        get_key_secret: RefCell<VecDeque<GetKeySecretMock>>,
+        state: Arc<MockServiceState>,
     }
 
     impl MockService {
@@ -134,23 +219,49 @@ pub(crate) mod testutils {
             password: &str,
             result: io::Result<KeySecret>,
         ) {
-            self.get_key_secret.get_mut().push_back(((key_id, password.to_owned()), result));
+            self.state
+                .get_key_secret
+                .lock()
+                .unwrap()
+                .push_back(((key_id, password.to_owned()), result));
         }
-    }
 
-    impl Drop for MockService {
-        fn drop(&mut self) {
-            assert!(self.get_key_secret.borrow().is_empty(), "Mock requests not fully consumed");
+        /// Records an expected keep-alive request and the result to return.
+        pub(crate) fn add_keep_alive(
+            &mut self,
+            key_id: Uuid,
+            password: &str,
+            result: io::Result<KeepAliveResult>,
+        ) {
+            self.state
+                .keep_alive
+                .lock()
+                .unwrap()
+                .push_back(((key_id, password.to_owned()), result));
         }
     }
 
     impl Service for MockService {
         async fn get_key_secret(&self, key_id: Uuid, password: &str) -> io::Result<KeySecret> {
-            let mock =
-                self.get_key_secret.borrow_mut().pop_front().expect("No mock requests available");
+            let mock = self
+                .state
+                .get_key_secret
+                .lock()
+                .unwrap()
+                .pop_front()
+                .expect("No mock requests available");
             assert_eq!(mock.0.0, key_id);
             assert_eq!(mock.0.1, password);
             mock.1
+        }
+
+        async fn keep_alive(&self, key_id: Uuid, password: &str) -> io::Result<KeepAliveResult> {
+            let mut mocks = self.state.keep_alive.lock().unwrap();
+            let position = mocks
+                .iter()
+                .position(|mock| mock.0.0 == key_id && mock.0.1 == password)
+                .expect("No mock request available for key");
+            mocks.remove(position).unwrap().1
         }
     }
 }
