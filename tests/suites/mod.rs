@@ -1,5 +1,5 @@
 // zkeys
-// Copyright 2025 Julio Merino.
+// Copyright 2026 Julio Merino.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-//! Integration tests for the command-line client.
+//! Collection of integration tests.
 
-mod common;
-mod suites;
+pub(crate) mod cli_suite;
+pub(crate) mod get_key_suite;

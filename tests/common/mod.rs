@@ -1,5 +1,5 @@
 // zkeys
-// Copyright 2025 Julio Merino.
+// Copyright 2026 Julio Merino.
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,15 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-//! Integration tests for the command-line client.
+//! Common code across integration tests.
 
-mod common;
-mod suites;
+use assert_cmd::Command;
+
+pub(crate) mod mocks;
+
+/// Constructs a `Command` to execute zkeys.
+pub(crate) fn zkeys() -> Command {
+    let mut command = Command::cargo_bin("zkeys").unwrap();
+    command.env("ZKEYS_TEST_PREFIX", "/non-existent/prefix");
+    command
+}

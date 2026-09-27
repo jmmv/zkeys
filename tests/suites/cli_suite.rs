@@ -24,7 +24,38 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-//! Integration tests for the command-line client.
+//! Integration tests for top-level command-line behavior.
 
-mod common;
-mod suites;
+use crate::common::zkeys;
+
+#[test]
+fn test_help() {
+    zkeys()
+        .arg("help")
+        .assert()
+        .code(0)
+        .stdout(
+            r#"Usage: zkeys command [arg...]
+
+Commands:
+    get-key             retrieve a key
+    help                show command-line usage information
+    version             show version information
+
+zkeys home page: https://zkeys.jmmv.dev/
+"#,
+        )
+        .stderr("");
+}
+
+#[test]
+fn test_config_file_is_not_a_global_option() {
+    zkeys()
+        .args(["--config-file", "/no/such/zkeys.toml", "version"])
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr(
+            "Usage error: Unrecognized option: 'config-file'\nType `zkeys help` or `man 8 zkeys` for more information\n",
+        );
+}
