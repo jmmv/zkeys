@@ -46,8 +46,14 @@ pub(crate) struct KeySecret {
     pub(crate) secret: String,
 }
 
+/// Interface to the zkeys service.
+pub(crate) trait Service {
+    /// Retrieves a key secret identified by `key_id` using `password`.
+    async fn get_key_secret(&self, key_id: Uuid, password: &str) -> io::Result<KeySecret>;
+}
+
 /// HTTP client for the zkeys service.
-pub struct Service {
+pub(crate) struct HttpService {
     /// Service API root URL.
     base_url: Url,
 
@@ -55,7 +61,7 @@ pub struct Service {
     client: reqwest::Client,
 }
 
-impl Service {
+impl HttpService {
     /// Creates a client for a service at `url`.
     pub fn new(url: Url) -> io::Result<Self> {
         if !(url.path().is_empty() || url.path() == "/") {
@@ -76,13 +82,10 @@ impl Service {
         url.set_path(path);
         url
     }
+}
 
-    /// Retrieves a key secret identified by `key_id` using `password`.
-    pub(crate) async fn get_key_secret(
-        &self,
-        key_id: Uuid,
-        password: &str,
-    ) -> io::Result<KeySecret> {
+impl Service for HttpService {
+    async fn get_key_secret(&self, key_id: Uuid, password: &str) -> io::Result<KeySecret> {
         let response = self
             .client
             .get(self.make_url(&format!("api/v1/keys/{}/secret", key_id)))
