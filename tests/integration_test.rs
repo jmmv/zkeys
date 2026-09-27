@@ -125,28 +125,6 @@ async fn test_get_key_invalid_service_key() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_key_locked() {
-    check_service_error(
-        StatusCode::FORBIDDEN,
-        "Access denied: Key locked",
-        "remote-password",
-        "zkeys: Service returned HTTP 403 Forbidden: Access denied: Key locked\n",
-    )
-    .await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_key_server_error() {
-    check_service_error(
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "Service temporarily unavailable",
-        "remote-password",
-        "zkeys: Service returned HTTP 500 Internal Server Error: Service temporarily unavailable\n",
-    )
-    .await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_key_service_error() {
     check_service_error(
         StatusCode::BAD_GATEWAY,
@@ -177,17 +155,6 @@ async fn test_get_key_unreachable_service() {
     assert!(stderr.starts_with("zkeys: error sending request for url ("));
     assert!(stderr.contains(&format!("{service_url}/api/v1/keys/{key_id}/secret")));
     assert!(!stderr.contains(password));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_key_wrong_password() {
-    check_service_error(
-        StatusCode::FORBIDDEN,
-        "Access denied: Failed to decrypt secret",
-        "wrong-password",
-        "zkeys: Service returned HTTP 403 Forbidden: Access denied: Failed to decrypt secret\n",
-    )
-    .await;
 }
 
 #[test]
@@ -300,19 +267,4 @@ fn test_get_key_invalid_service_url() {
         .stderr(format!(
             "zkeys: Invalid service API address {service_url}: cannot contain a path\n"
         ));
-}
-
-#[test]
-fn test_get_key_unknown_name() {
-    let key_id = uuid!("6de5a8c5-3549-4b4a-b6d2-daca1ec29012");
-    let config = make_config("http://127.0.0.1:1", key_id, "password", "local-secret-");
-
-    zkeys()
-        .args(["get-key", "--config-file"])
-        .arg(config.path())
-        .arg("unknown")
-        .assert()
-        .code(1)
-        .stdout("")
-        .stderr("zkeys: No key named unknown is configured\n");
 }

@@ -27,19 +27,99 @@
 //! `get-key` command implementation.
 
 use crate::Config;
+use crate::config::Key;
 use crate::service::{HttpService, Service};
+use std::collections::HashMap;
 use std::io;
 
-/// Retrieves `name` from the configured service and writes it to standard output.
-pub async fn get_key(config: Config, name: &str) -> io::Result<()> {
-    let service = HttpService::new(config.service_url)?;
-
-    let key = config.keys.get(name).ok_or_else(|| {
+/// Retrieves `name` from `service` and returns the full key material.
+async fn get_key_internal<S: Service>(
+    keys: &HashMap<String, Key>,
+    name: &str,
+    service: &S,
+) -> io::Result<String> {
+    let key = keys.get(name).ok_or_else(|| {
         io::Error::new(io::ErrorKind::NotFound, format!("No key named {name} is configured"))
     })?;
 
     let result = service.get_key_secret(key.id, &key.remote_password).await?;
-    println!("{}{}", key.local_secret, result.secret);
+    Ok(format!("{}{}", key.local_secret, result.secret))
+}
+
+/// Retrieves `name` from the configured service and writes it to standard output.
+pub async fn get_key(config: Config, name: &str) -> io::Result<()> {
+    let service = HttpService::new(config.service_url.clone())?;
+    let secret = get_key_internal(&config.keys, name, &service).await?;
+    println!("{secret}");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Key;
+    use crate::service::KeySecret;
+    use crate::service::testutils::MockService;
+    use std::collections::HashMap;
+    use uuid::{Uuid, uuid};
+
+    const KEY_ID: Uuid = uuid!("6de5a8c5-3549-4b4a-b6d2-daca1ec29012");
+
+    /// Returns a configuration containing one key named `test`.
+    fn make_keys() -> HashMap<String, Key> {
+        let mut keys = HashMap::new();
+        keys.insert(
+            "test".to_owned(),
+            Key {
+                id: KEY_ID,
+                local_secret: "local-secret-".to_owned(),
+                remote_password: "remote-password".to_owned(),
+            },
+        );
+        keys
+    }
+
+    #[tokio::test]
+    async fn test_ok() {
+        let keys = make_keys();
+        let mut service = MockService::default();
+        service.add_get_key_secret(
+            KEY_ID,
+            "remote-password",
+            Ok(KeySecret { secret: "service-secret".to_owned() }),
+        );
+
+        assert_eq!(
+            "local-secret-service-secret",
+            get_key_internal(&keys, "test", &service).await.unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_service_error() {
+        let keys = make_keys();
+        let mut service = MockService::default();
+        service.add_get_key_secret(
+            KEY_ID,
+            "remote-password",
+            Err(io::Error::other("Injected error")),
+        );
+
+        let error = get_key_internal(&keys, "test", &service).await.unwrap_err();
+
+        assert_eq!(io::ErrorKind::Other, error.kind());
+        assert_eq!("Injected error", error.to_string());
+    }
+
+    #[tokio::test]
+    async fn test_unknown_name() {
+        let keys = make_keys();
+        let service = MockService::default();
+
+        let error = get_key_internal(&keys, "unknown", &service).await.unwrap_err();
+
+        assert_eq!(io::ErrorKind::NotFound, error.kind());
+        assert_eq!("No key named unknown is configured", error.to_string());
+    }
 }
