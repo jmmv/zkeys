@@ -108,3 +108,49 @@ impl Service for HttpService {
         Ok(KeySecret { secret })
     }
 }
+
+#[cfg(test)]
+pub(crate) mod testutils {
+    use super::{KeySecret, Service};
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::io;
+    use uuid::Uuid;
+
+    /// Mapping of a `get_key` request to the mock response.
+    type GetKeySecretMock = ((Uuid, String), io::Result<KeySecret>);
+
+    /// Service implementation that returns predefined results for expected requests.
+    #[derive(Default)]
+    pub(crate) struct MockService {
+        get_key_secret: RefCell<VecDeque<GetKeySecretMock>>,
+    }
+
+    impl MockService {
+        /// Records an expected key-secret request and the result to return.
+        pub(crate) fn add_get_key_secret(
+            &mut self,
+            key_id: Uuid,
+            password: &str,
+            result: io::Result<KeySecret>,
+        ) {
+            self.get_key_secret.get_mut().push_back(((key_id, password.to_owned()), result));
+        }
+    }
+
+    impl Drop for MockService {
+        fn drop(&mut self) {
+            assert!(self.get_key_secret.borrow().is_empty(), "Mock requests not fully consumed");
+        }
+    }
+
+    impl Service for MockService {
+        async fn get_key_secret(&self, key_id: Uuid, password: &str) -> io::Result<KeySecret> {
+            let mock =
+                self.get_key_secret.borrow_mut().pop_front().expect("No mock requests available");
+            assert_eq!(mock.0.0, key_id);
+            assert_eq!(mock.0.1, password);
+            mock.1
+        }
+    }
+}
