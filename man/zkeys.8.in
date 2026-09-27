@@ -23,7 +23,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd September 13, 2026
+.Dd September 27, 2026
 .Dt ZKEYS 8
 .Os
 .Sh NAME
@@ -34,6 +34,10 @@
 .Cm get-key
 .Op Fl -config-file Ar file
 .Ar name
+.Nm
+.Cm keep-alive
+.Op Fl -config-file Ar file
+.Op Ar name1 .. nameN
 .Nm
 .Cm help
 .Op Ar command
@@ -61,6 +65,33 @@ It prepends the configured local secret to the service response and writes the
 result to standard output, followed by a newline.
 .Pp
 The following option is supported:
+.Bl -tag -width XXXX
+.It Fl -config-file Ar file
+Path to the configuration file.
+.Pp
+Default:
+.Pa @PREFIX@/etc/zkeys.toml
+.El
+.Ss The keep-alive command
+The keep-alive command periodically updates the last-access time of keys so
+that the service does not automatically lock them.
+This command is intended to be run as a system service while the machine is
+active so that the keys remain unlocked and are ready for the next boot.
+.Pp
+If one or more key names are given, they must all identify keys in the
+configuration file.
+If no names are given, the command operates on all configured keys.
+.Pp
+Each key is first refreshed immediately and, during the process, the server
+returns a recommended refresh period for subsequent requests.
+If the service does not provide a refresh period or the keep-alive ping
+fails, the value of
+.Va default_key_refresh_period
+from
+.Xr zkeys.toml 5
+is used.
+.Pp
+The following options are supported:
 .Bl -tag -width XXXX
 .It Fl -config-file Ar file
 Path to the configuration file.

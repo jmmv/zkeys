@@ -28,15 +28,23 @@
 
 use axum::Router;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use serde::Deserialize;
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+/// Header that reports the recommended period between keepalive requests.
+const REFRESH_PERIOD_HEADER: &str = "X-Key-Refresh-Period-Seconds";
+
+/// Refresh period used by successful mock secret responses.
+const DEFAULT_REFRESH_PERIOD: &str = "300";
 
 /// Query parameters accepted by the mock secret endpoint.
 #[derive(Deserialize)]
@@ -55,7 +63,19 @@ struct Request {
     password: String,
 }
 
-/// State shared by the mock endpoint.
+/// Response to return from the mock keepalive endpoint.
+pub(crate) struct KeepAliveResponse {
+    /// Response body.
+    pub(crate) body: &'static str,
+
+    /// Optional refresh-period header value.
+    pub(crate) refresh_period: Option<&'static str>,
+
+    /// HTTP status code.
+    pub(crate) status: StatusCode,
+}
+
+/// State shared by the mock endpoints.
 struct MockState {
     /// Status to return to the client.
     status: StatusCode,
@@ -63,8 +83,11 @@ struct MockState {
     /// Body to return to the client.
     body: String,
 
-    /// Sender used to report the request to the test.
-    request_tx: Mutex<Option<oneshot::Sender<Request>>>,
+    /// Sender used to report requests to the test.
+    request_tx: mpsc::UnboundedSender<Request>,
+
+    /// Responses to return from the keepalive endpoint in request order.
+    keep_alive_responses: Mutex<VecDeque<KeepAliveResponse>>,
 }
 
 /// Handles requests to the mock secret endpoint.
@@ -72,11 +95,33 @@ async fn get_secret(
     State(state): State<Arc<MockState>>,
     Path(key_id): Path<Uuid>,
     Query(query): Query<KeyQuery>,
-) -> (StatusCode, String) {
-    if let Some(request_tx) = state.request_tx.lock().await.take() {
-        request_tx.send(Request { key_id, password: query.password }).unwrap();
+) -> Response {
+    state.request_tx.send(Request { key_id, password: query.password }).unwrap();
+    let mut response = (state.status, state.body.clone()).into_response();
+    if state.status == StatusCode::OK {
+        response
+            .headers_mut()
+            .insert(REFRESH_PERIOD_HEADER, HeaderValue::from_static(DEFAULT_REFRESH_PERIOD));
     }
-    (state.status, state.body.clone())
+    response
+}
+
+/// Handles requests to the mock keepalive endpoint.
+async fn keep_alive(
+    State(state): State<Arc<MockState>>,
+    Path(key_id): Path<Uuid>,
+    Query(query): Query<KeyQuery>,
+) -> Response {
+    state.request_tx.send(Request { key_id, password: query.password }).unwrap();
+    let specification =
+        state.keep_alive_responses.lock().await.pop_front().expect("Unexpected keepalive request");
+    let mut response = (specification.status, specification.body).into_response();
+    if let Some(refresh_period) = specification.refresh_period {
+        response
+            .headers_mut()
+            .insert(REFRESH_PERIOD_HEADER, HeaderValue::from_str(refresh_period).unwrap());
+    }
+    response
 }
 
 /// Mock service running on a loopback TCP port.
@@ -84,8 +129,11 @@ pub struct MockService {
     /// URL at which the client can reach the service.
     pub url: String,
 
-    /// Receiver for the request made by the client.
-    request_rx: oneshot::Receiver<Request>,
+    /// Receiver for requests made by the client.
+    request_rx: mpsc::UnboundedReceiver<Request>,
+
+    /// State shared by the mock endpoints.
+    state: Arc<MockState>,
 
     /// Sender used to stop the mock service.
     shutdown_tx: Option<oneshot::Sender<()>>,
@@ -99,15 +147,18 @@ impl MockService {
     pub async fn start(status: StatusCode, body: &str) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
-        let (request_tx, request_rx) = oneshot::channel();
+        let (request_tx, request_rx) = mpsc::unbounded_channel();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let state = Arc::new(MockState {
             status,
             body: body.to_owned(),
-            request_tx: Mutex::new(Some(request_tx)),
+            request_tx,
+            keep_alive_responses: Mutex::new(VecDeque::new()),
         });
-        let app =
-            Router::new().route("/api/v1/keys/{key_id}/secret", get(get_secret)).with_state(state);
+        let app = Router::new()
+            .route("/api/v1/keys/{key_id}/keepalive", get(keep_alive))
+            .route("/api/v1/keys/{key_id}/secret", get(get_secret))
+            .with_state(Arc::clone(&state));
         let task = tokio::spawn(async move {
             axum::serve(listener, app)
                 .with_graceful_shutdown(async { shutdown_rx.await.unwrap() })
@@ -115,21 +166,44 @@ impl MockService {
                 .unwrap();
         });
 
-        Self { url, request_rx, shutdown_tx: Some(shutdown_tx), task }
+        Self { url, request_rx, state, shutdown_tx: Some(shutdown_tx), task }
+    }
+
+    /// Adds a keepalive response to return in request order.
+    pub(crate) async fn add_keep_alive_response(&self, response: KeepAliveResponse) {
+        self.state.keep_alive_responses.lock().await.push_back(response);
+    }
+
+    /// Returns the next request received by the service.
+    pub(crate) async fn next_request(&mut self) -> (Uuid, String) {
+        let request = tokio::time::timeout(Duration::from_secs(2), self.request_rx.recv())
+            .await
+            .expect("Client did not contact mock service")
+            .expect("Mock service stopped before receiving a request");
+        (request.key_id, request.password)
     }
 
     /// Verifies the request received from the client.
     pub async fn check_request(&mut self, expected_key_id: Uuid, expected_password: &str) {
-        let request = tokio::time::timeout(Duration::from_secs(1), &mut self.request_rx)
-            .await
-            .expect("Client did not contact mock service")
-            .expect("Mock service stopped before receiving a request");
-        assert_eq!(expected_key_id, request.key_id);
-        assert_eq!(expected_password, request.password);
+        let (key_id, password) = self.next_request().await;
+        assert_eq!(expected_key_id, key_id);
+        assert_eq!(expected_password, password);
+    }
+
+    /// Verifies that no further request arrives within a short period.
+    pub(crate) async fn check_no_requests(&mut self) {
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), self.request_rx.recv()).await.is_err()
+        );
     }
 
     /// Stops the mock service and waits for it to exit.
     pub async fn shutdown(mut self) {
+        assert!(self.request_rx.is_empty(), "Mock requests not fully consumed");
+        assert!(
+            self.state.keep_alive_responses.lock().await.is_empty(),
+            "Mock responses not fully consumed"
+        );
         self.shutdown_tx.take().unwrap().send(()).unwrap();
         self.task.await.unwrap();
     }

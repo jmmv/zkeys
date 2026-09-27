@@ -40,6 +40,7 @@ fn test_help() {
 Commands:
     get-key             retrieve a key
     help                show command-line usage information
+    keep-alive          periodically keep keys alive
     version             show version information
 
 zkeys home page: https://zkeys.jmmv.dev/

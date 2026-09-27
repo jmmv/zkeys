@@ -30,4 +30,6 @@ mod config;
 pub use config::Config;
 mod get_key;
 pub use get_key::get_key;
+mod keep_alive;
+pub use keep_alive::keep_alive;
 mod service;
