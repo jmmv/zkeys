@@ -73,6 +73,7 @@ fn get_key_setup(builder: CommandBuilder) -> CommandBuilder {
 
 /// Runs the `get-key` command.
 async fn get_key_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    init_env_logger(env!("CARGO_BIN_NAME"));
     let paths = Paths::default().with_overrides(&command_matches);
     let config = Config::parse(&paths.config_file).with_context(|| {
         format!("Failed to load configuration file {}", paths.config_file.display())
@@ -96,6 +97,7 @@ fn keep_alive_setup(builder: CommandBuilder) -> CommandBuilder {
 
 /// Runs the `keep-alive` command.
 async fn keep_alive_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let paths = Paths::default().with_overrides(&command_matches);
     let config = Config::parse(&paths.config_file).with_context(|| {
         format!("Failed to load configuration file {}", paths.config_file.display())
@@ -108,6 +110,7 @@ async fn keep_alive_main(_app_matches: Matches, command_matches: Matches) -> Res
 fn app_setup(builder: Builder) -> Builder {
     builder
         .copyright("Copyright 2025-2026 Julio Merino")
+        .disable_init_env_logger()
         .homepage(env!("CARGO_PKG_HOMEPAGE"))
         .manpage(env!("CARGO_BIN_NAME"), "8")
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)

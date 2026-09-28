@@ -112,7 +112,8 @@ async fn test_refresh_period_changes() {
 
     assert_eq!(Some(0), output.status.code());
     assert_eq!(b"", output.stdout.as_slice());
-    assert!(stderr.contains("Sending keepalive for key test"));
+    assert!(stderr.starts_with('['));
+    assert!(stderr.contains(" INFO  zkeys::keep_alive] Sending keepalive for key test"));
     assert!(stderr.contains("Next keepalive for key test is due in 0ns"));
     assert!(stderr.contains("Next keepalive for key test is due in 1s"));
     assert!(stderr.contains("Keepalive for key test failed: key was deleted"));

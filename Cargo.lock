@@ -2004,6 +2004,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "axum",
+ "env_logger",
  "getoptsargs",
  "humantime",
  "log",
