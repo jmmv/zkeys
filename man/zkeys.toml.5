@@ -100,9 +100,9 @@ Each ZFS dataset is declared in a
 table, where
 .Ar dataset
 is the dataset name and must be quoted if it contains a slash.
-These entries map datasets to keys so that the
-.Cm zfs-*
-commands can operate on them automatically.
+These entries map datasets to keys so that commands such as
+.Cm zkeys zfs-load-key
+can operate on them automatically.
 .Pp
 Each table must contain the following setting:
 .Bl -tag -width XXXX

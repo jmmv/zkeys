@@ -33,7 +33,7 @@ use std::collections::HashMap;
 use std::io;
 
 /// Retrieves `name` from `service` and returns the full key material.
-async fn get_key_internal<S: Service>(
+pub(crate) async fn get_key_internal<S: Service>(
     keys: &HashMap<String, Key>,
     name: &str,
     service: &S,

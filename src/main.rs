@@ -106,6 +106,44 @@ async fn keep_alive_main(_app_matches: Matches, command_matches: Matches) -> Res
     Ok(0)
 }
 
+/// Adds the options and arguments for the `zfs-load-key` command.
+fn zfs_load_key_setup(builder: CommandBuilder) -> CommandBuilder {
+    let paths = Paths::default();
+    builder
+        .optflag("a", "all", "load keys for all configured ZFS datasets")
+        .optopt(
+            "",
+            "config-file",
+            &format!("path to the configuration file (default: {})", paths.config_file.display()),
+            "FILE",
+        )
+        .trailarg("dataset", 0, 1, "ZFS dataset whose key to load")
+}
+
+/// Runs the `zfs-load-key` command.
+async fn zfs_load_key_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    init_env_logger(env!("CARGO_BIN_NAME"));
+    let all = command_matches.opt_present("all");
+    let dataset = command_matches.arg_trail().first().map(String::as_str);
+    let dataset = match (all, dataset) {
+        (false, None) => {
+            return Err(bad_usage!("Either a dataset or --all must be specified").into());
+        }
+        (false, Some(dataset)) => Some(dataset),
+        (true, None) => None,
+        (true, Some(_)) => {
+            return Err(bad_usage!("A dataset and --all cannot be specified together").into());
+        }
+    };
+
+    let paths = Paths::default().with_overrides(&command_matches);
+    let config = Config::parse(&paths.config_file).with_context(|| {
+        format!("Failed to load configuration file {}", paths.config_file.display())
+    })?;
+    zfs_load_key(config, dataset).await?;
+    Ok(0)
+}
+
 /// Configures the command-line application and its subcommands.
 fn app_setup(builder: Builder) -> Builder {
     builder
@@ -115,6 +153,12 @@ fn app_setup(builder: Builder) -> Builder {
         .manpage(env!("CARGO_BIN_NAME"), "8")
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)
         .cmd_async("keep-alive", "periodically keep keys alive", keep_alive_setup, keep_alive_main)
+        .cmd_async(
+            "zfs-load-key",
+            "load a key for a ZFS dataset",
+            zfs_load_key_setup,
+            zfs_load_key_main,
+        )
 }
 
 tokio_app!("zkeys", app_setup, tokio_command_dispatcher);
