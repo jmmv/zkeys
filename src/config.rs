@@ -86,6 +86,7 @@ pub struct Config {
     pub service_url: Url,
 
     /// Keys indexed by their local names.
+    #[serde(default)]
     pub keys: HashMap<String, Key>,
 
     /// ZFS datasets indexed by their names.
@@ -125,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_parse_from_str_defaults() {
-        let config = Config::parse_from_str("[keys]").unwrap();
+        let config = Config::parse_from_str("").unwrap();
 
         assert_eq!(
             Config {
@@ -204,8 +205,6 @@ key = "second"
     fn test_parse_from_str_rejects_invalid_zfs_entry() {
         let error = Config::parse_from_str(
             r#"
-[keys]
-
 [zfs.dataset]
 key = ["not", "a", "string"]
 "#,
@@ -220,8 +219,6 @@ key = ["not", "a", "string"]
     fn test_parse_from_str_rejects_undefined_zfs_key() {
         let error = Config::parse_from_str(
             r#"
-[keys]
-
 [zfs."pool/dataset"]
 key = "missing"
 "#,
@@ -235,15 +232,7 @@ key = "missing"
     #[test]
     fn test_parse_reads_configuration_file() {
         let file = NamedTempFile::new().unwrap();
-        fs::write(
-            file.path(),
-            r#"
-service_url = "https://example.com/api/"
-
-[keys]
-"#,
-        )
-        .unwrap();
+        fs::write(file.path(), r#"service_url = "https://example.com/api/""#).unwrap();
 
         let config = Config::parse(file.path()).unwrap();
         assert_eq!(Url::parse("https://example.com/api/").unwrap(), config.service_url);
