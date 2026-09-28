@@ -39,6 +39,24 @@ $ make install PREFIX=/opt/local
 If you are on FreeBSD (the primary target of this project), make sure to use
 `gmake` for proper behavior.
 
+## FreeBSD setup
+
+1.  If you don't have `/usr/local/etc/zkeys.toml` yet, use
+    `/usr/local/etc/zkeys.toml.tmpl` as your starting template.  Make sure
+    the file is root-protected before adding secrets to it.
+
+1.  Once you have added secrets, enable and start the installed service:
+
+    ```sh
+    sysrc zkeys_keep_alive_enable=YES
+    service zkeys_keep_alive start
+    ```
+
+1.  Review `/var/log/zkeys_keep_alive.log` and confirm that the log mentions
+    that your keys are being kept alive successfully.  (The keys may have
+    been auto-locked before reaching this step, so if you see errors, first
+    check that the key is unlocked in the dashboard.)
+
 ## Documentation
 
 Once `zkeys` is installed, take a look at the `zkeys(8)` and `zkeys.toml(5)`

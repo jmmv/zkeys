@@ -36,6 +36,10 @@ install() {
 
 install -m 755 -d "${PREFIX}/sbin"
 install -m 755 target/release/zkeys "${PREFIX}/sbin/zkeys"
+install -m 755 -d "${PREFIX}/etc"
+install -m 600 zkeys.toml.tmpl "${PREFIX}/etc/zkeys.toml.tmpl"
+install -m 755 -d "${PREFIX}/etc/rc.d"
+install -m 755 freebsd/keep_alive.rc.d.sh "${PREFIX}/etc/rc.d/zkeys_keep_alive"
 install -m 755 -d "${PREFIX}/share/man/man5"
 install -m 644 man/zkeys.toml.5 "${PREFIX}/share/man/man5/zkeys.toml.5"
 install -m 755 -d "${PREFIX}/share/man/man8"
