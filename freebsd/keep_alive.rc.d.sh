@@ -1,5 +1,7 @@
-# ZKeys
-# Copyright 2026 Julio Merino
+#!/bin/sh
+# shellcheck disable=SC1091,SC2034
+# zkeys
+# Copyright 2026 Julio Merino.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,24 +26,31 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-. type=dir
-    sbin type=dir mode=0755
-        zkeys type=file mode=0755
-    ..
-    etc type=dir mode=0755
-        rc.d type=dir mode=0755
-            zkeys_keep_alive type=file mode=0755
-        ..
-        zkeys.toml.tmpl type=file mode=0600
-    ..
-    share type=dir mode=0755
-        man type=dir mode=0755
-            man5 type=dir mode=0755
-                zkeys.toml.5 type=file mode=0644
-            ..
-            man8 type=dir mode=0755
-                zkeys.8 type=file mode=0644
-            ..
-        ..
-    ..
-..
+# PROVIDE: zkeys_keep_alive
+# REQUIRE: NETWORKING
+
+. /etc/rc.subr
+
+name="zkeys_keep_alive"
+desc="The ZKeys keep-alive service"
+command="daemon"
+rcvar="zkeys_keep_alive_enable"
+pidfile="/var/run/${name}.pid"
+start_cmd="zkeys_keep_alive_start"
+required_files="/usr/local/etc/zkeys.toml /usr/local/sbin/zkeys"
+
+zkeys_keep_alive_start()
+{
+    if [ ! -f /var/log/${name}.log ]; then
+        touch /var/log/${name}.log
+        chmod 600 /var/log/${name}.log
+        chown root:wheel /var/log/${name}.log
+    fi
+
+    echo "Starting ${name}."
+    daemon -P "${pidfile}" -o /var/log/${name}.log -H -t "${name}" \
+        /usr/local/sbin/zkeys keep-alive --config-file /usr/local/etc/zkeys.toml
+}
+
+load_rc_config $name
+run_rc_command "$1"
