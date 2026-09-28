@@ -28,6 +28,7 @@ collapsible_else_if = "allow"
 
 [dependencies]
 anyhow = "1"
+env_logger = "0.11"
 getoptsargs = { version = "0.4", features = ["env_logger"] }
 humantime = "2"
 log = "0.4"
