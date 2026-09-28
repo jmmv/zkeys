@@ -10,3 +10,8 @@ service_url = "https://zkeys.jmmv.dev/"
 id = "01234567-89ab-cdef-0123-4567890abcde"
 remote_password = "replace-with-the-remote-password"
 local_secret = "replace-with-the-local-secret"
+
+# Associate ZFS encryption roots with keys.  Dataset names containing slashes
+# must be quoted.
+#[zfs."pool/example"]
+#key = "example"

@@ -271,6 +271,7 @@ mod tests {
             default_key_refresh_period: default_period,
             keys,
             service_url: Url::parse("http://unused.example/").unwrap(),
+            zfs: HashMap::default(),
         }
     }
 
