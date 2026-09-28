@@ -57,6 +57,25 @@ If you are on FreeBSD (the primary target of this project), make sure to use
     been auto-locked before reaching this step, so if you see errors, first
     check that the key is unlocked in the dashboard.)
 
+1.  Associate ZFS encryption roots with their keys in `zkeys.toml`.  Dataset
+    names containing slashes must be quoted:
+
+    ```toml
+    [zfs."tank/private"]
+    key = "private-key"
+    ```
+
+1.  Enable and start the ZFS mounting service:
+
+    ```sh
+    sysrc zkeys_mount_all_enable=YES
+    service zkeys_mount_all start
+    ```
+
+    The service loads all configured ZFS keys, mounts all available datasets,
+    and shares them.  Do not enable FreeBSD's `zfskeys` service for these
+    datasets because it uses the separate ZFS `keylocation` policy.
+
 ## Documentation
 
 Once `zkeys` is installed, take a look at the `zkeys(8)` and `zkeys.toml(5)`
