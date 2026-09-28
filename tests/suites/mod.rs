@@ -29,3 +29,4 @@
 pub(crate) mod cli_suite;
 pub(crate) mod get_key_suite;
 pub(crate) mod keep_alive_suite;
+pub(crate) mod zfs_load_key_suite;

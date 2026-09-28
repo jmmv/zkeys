@@ -33,3 +33,6 @@ pub use get_key::get_key;
 mod keep_alive;
 pub use keep_alive::keep_alive;
 mod service;
+pub(crate) mod zfs;
+mod zfs_load_key;
+pub use zfs_load_key::zfs_load_key;
