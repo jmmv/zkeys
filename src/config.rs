@@ -65,6 +65,14 @@ pub struct Key {
     pub local_secret: String,
 }
 
+/// Describes the key associated with a ZFS dataset.
+#[derive(Clone, Deserialize)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+pub struct ZfsDataset {
+    /// Name of the key used to unlock the dataset.
+    pub key: String,
+}
+
 /// Describes the zkeys client configuration.
 #[derive(Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
@@ -79,12 +87,28 @@ pub struct Config {
 
     /// Keys indexed by their local names.
     pub keys: HashMap<String, Key>,
+
+    /// ZFS datasets indexed by their names.
+    #[serde(default)]
+    pub zfs: HashMap<String, ZfsDataset>,
 }
 
 impl Config {
     /// Parses a configuration file in `content`.
     fn parse_from_str(content: &str) -> io::Result<Self> {
-        toml::from_str(content).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+        let config: Self = toml::from_str(content)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+
+        for (dataset, zfs) in &config.zfs {
+            if !config.keys.contains_key(&zfs.key) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("ZFS dataset {dataset} references undefined key {}", zfs.key),
+                ));
+            }
+        }
+
+        Ok(config)
     }
 
     /// Parses a configuration file at `path`.
@@ -108,6 +132,7 @@ mod tests {
                 service_url: Url::parse("https://zkeys.jmmv.dev/").unwrap(),
                 keys: HashMap::default(),
                 default_key_refresh_period: default_key_refresh_period(),
+                zfs: HashMap::default(),
             },
             config
         );
@@ -136,6 +161,10 @@ mod tests {
             },
         );
 
+        let mut zfs = HashMap::default();
+        zfs.insert("pool/first".to_owned(), ZfsDataset { key: "first".to_owned() });
+        zfs.insert("second".to_owned(), ZfsDataset { key: "second".to_owned() });
+
         let config = Config::parse_from_str(&format!(
             r#"
 service_url = "https://example.com/api/"
@@ -150,6 +179,12 @@ local_secret = "local-secret-1"
 id = "{KEY_ID_2}"
 remote_password = "remote-password-2"
 local_secret = "local-secret-2"
+
+[zfs."pool/first"]
+key = "first"
+
+[zfs.second]
+key = "second"
 "#
         ))
         .unwrap();
@@ -158,10 +193,43 @@ local_secret = "local-secret-2"
             Config {
                 service_url: Url::parse("https://example.com/api/").unwrap(),
                 default_key_refresh_period: Duration::from_secs(2 * 24 * 60 * 60),
-                keys
+                keys,
+                zfs,
             },
             config
         );
+    }
+
+    #[test]
+    fn test_parse_from_str_rejects_invalid_zfs_entry() {
+        let error = Config::parse_from_str(
+            r#"
+[keys]
+
+[zfs.dataset]
+key = ["not", "a", "string"]
+"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(io::ErrorKind::InvalidData, error.kind());
+        assert!(error.to_string().contains("invalid type"));
+    }
+
+    #[test]
+    fn test_parse_from_str_rejects_undefined_zfs_key() {
+        let error = Config::parse_from_str(
+            r#"
+[keys]
+
+[zfs."pool/dataset"]
+key = "missing"
+"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(io::ErrorKind::InvalidData, error.kind());
+        assert_eq!("ZFS dataset pool/dataset references undefined key missing", error.to_string());
     }
 
     #[test]
