@@ -26,8 +26,9 @@
 
 //! Utilities to call into the `zfs` tool.
 
+use log::info;
 use std::io;
-use std::process::Stdio;
+use std::process::{ExitStatus, Stdio};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
@@ -62,6 +63,29 @@ fn command_error(operation: &str, output: std::process::Output) -> io::Error {
     io::Error::other(message)
 }
 
+/// Runs a ZFS operation and provides `key` on its standard input.
+async fn run_with_key(args: &[String], operation: &str, key: &str) -> io::Result<ExitStatus> {
+    info!("Running: zfs {}", args.to_vec().join(" "));
+    let mut command = Command::new("zfs");
+    command.args(args);
+    command.stdin(Stdio::piped());
+    let mut child = command.spawn().map_err(|error| {
+        io::Error::new(error.kind(), format!("Failed to execute {operation}: {error}"))
+    })?;
+
+    let mut stdin = child.stdin.take().expect("Piped stdin is missing");
+    let write_result = stdin.write_all(key.as_bytes()).await;
+    drop(stdin);
+    let wait_result = child.wait().await;
+
+    write_result.map_err(|error| {
+        io::Error::new(error.kind(), format!("Failed to provide the key to {operation}: {error}"))
+    })?;
+    wait_result.map_err(|error| {
+        io::Error::new(error.kind(), format!("Failed to wait for {operation}: {error}"))
+    })
+}
+
 impl Zfs for CommandZfs {
     async fn key_status(&self, dataset: &str) -> io::Result<KeyStatus> {
         let output = Command::new("zfs")
@@ -88,36 +112,11 @@ impl Zfs for CommandZfs {
     }
 
     async fn load_key(&self, dataset: &str, key: &str) -> io::Result<()> {
-        let mut child = Command::new("zfs")
-            .args(["load-key", "-L", "prompt", dataset])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| {
-                io::Error::new(
-                    error.kind(),
-                    format!("Failed to execute zfs load-key for {dataset}: {error}"),
-                )
-            })?;
-
-        let mut stdin = child.stdin.take().expect("Piped stdin is missing");
-        stdin.write_all(key.as_bytes()).await.map_err(|error| {
-            io::Error::new(
-                error.kind(),
-                format!("Failed to provide the key to zfs load-key for {dataset}: {error}"),
-            )
-        })?;
-        drop(stdin);
-
-        let output = child.wait_with_output().await.map_err(|error| {
-            io::Error::new(
-                error.kind(),
-                format!("Failed to wait for zfs load-key for {dataset}: {error}"),
-            )
-        })?;
-        if !output.status.success() {
-            return Err(command_error(&format!("zfs load-key for {dataset}"), output));
+        let args = ["load-key", "-L", "prompt", dataset].map(str::to_owned);
+        let operation = format!("zfs load-key for {dataset}");
+        let status = run_with_key(&args, &operation, key).await?;
+        if !status.success() {
+            return Err(io::Error::other(format!("{operation} failed with {status}")));
         }
         Ok(())
     }
