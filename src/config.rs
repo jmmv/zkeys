@@ -28,8 +28,9 @@
 
 use serde::{Deserialize, Deserializer, de};
 use std::collections::HashMap;
-use std::fs;
-use std::io;
+use std::fs::File;
+use std::io::{self, Read};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::time::Duration;
 use url::Url;
@@ -114,7 +115,17 @@ impl Config {
 
     /// Parses a configuration file at `path`.
     pub fn parse<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        let content = fs::read_to_string(path.as_ref())?;
+        let mut file = File::open(path.as_ref())?;
+
+        if file.metadata()?.permissions().mode() & 0o066 != 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "configuration file is accessible by group or others",
+            ));
+        }
+
+        let mut content = String::new();
+        file.read_to_string(&mut content)?;
         Self::parse_from_str(&content)
     }
 }
@@ -122,7 +133,15 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use tempfile::NamedTempFile;
+
+    /// Changes the permissions of already-open `file` to `mode`.
+    fn set_file_mode(file: &File, mode: u32) -> io::Result<()> {
+        let mut permissions = file.metadata()?.permissions();
+        permissions.set_mode(mode);
+        file.set_permissions(permissions)
+    }
 
     #[test]
     fn test_parse_from_str_defaults() {
@@ -236,6 +255,20 @@ key = "missing"
 
         let config = Config::parse(file.path()).unwrap();
         assert_eq!(Url::parse("https://example.com/api/").unwrap(), config.service_url);
+    }
+
+    #[test]
+    fn test_parse_rejects_group_or_other_access() {
+        for mode in [0o640, 0o620, 0o604, 0o602] {
+            let file = NamedTempFile::new().unwrap();
+            fs::write(file.path(), "").unwrap();
+            set_file_mode(file.as_file(), mode).unwrap();
+
+            let error = Config::parse(file.path()).unwrap_err();
+
+            assert_eq!(io::ErrorKind::PermissionDenied, error.kind());
+            assert_eq!("configuration file is accessible by group or others", error.to_string());
+        }
     }
 
     #[test]
