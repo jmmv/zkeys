@@ -34,6 +34,8 @@ mod keep_alive;
 pub use keep_alive::keep_alive;
 mod service;
 pub(crate) mod zfs;
+mod zfs_change_key;
+pub use zfs_change_key::zfs_change_key;
 mod zfs_create;
 pub use zfs_create::zfs_create;
 mod zfs_load_key;
