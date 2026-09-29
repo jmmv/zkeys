@@ -153,6 +153,15 @@ fn zfs_key_input_setup(builder: CommandBuilder) -> CommandBuilder {
         .extra_help(zfs_extra_help)
 }
 
+/// Runs the `zfs-change-key` command.
+async fn zfs_change_key_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    init_env_logger(env!("CARGO_BIN_NAME"));
+    let config = load_config(&command_matches)?;
+    zfs_change_key(config, command_matches.opt_present("quiet"), command_matches.arg_trail())
+        .await?;
+    Ok(0)
+}
+
 /// Runs the `zfs-create` command.
 async fn zfs_create_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
     init_env_logger(env!("CARGO_BIN_NAME"));
@@ -170,6 +179,12 @@ fn app_setup(builder: Builder) -> Builder {
         .manpage(env!("CARGO_BIN_NAME"), "8")
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)
         .cmd_async("keep-alive", "periodically keep keys alive", keep_alive_setup, keep_alive_main)
+        .cmd_async(
+            "zfs-change-key",
+            "change a ZFS encryption key",
+            zfs_key_input_setup,
+            zfs_change_key_main,
+        )
         .cmd_async(
             "zfs-create",
             "create an encrypted ZFS dataset",

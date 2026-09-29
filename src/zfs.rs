@@ -41,6 +41,9 @@ pub(crate) enum KeyStatus {
 
 /// Interface to the ZFS command-line utility.
 pub(crate) trait Zfs {
+    /// Changes a dataset's encryption key to `key`.
+    async fn change_key(&self, key: &str, args: &[String]) -> io::Result<()>;
+
     /// Creates an encrypted dataset using `key`.
     async fn create(&self, key: &str, args: &[String]) -> io::Result<()>;
 
@@ -99,6 +102,19 @@ async fn run_with_key(args: &[String], operation: &str, key: &str) -> io::Result
 }
 
 impl Zfs for CommandZfs {
+    async fn change_key(&self, key: &str, args: &[String]) -> io::Result<()> {
+        let args = ["change-key", "-o", "keyformat=passphrase", "-o", "keylocation=prompt"]
+            .into_iter()
+            .map(str::to_owned)
+            .chain(args.iter().cloned())
+            .collect::<Vec<_>>();
+        let status = run_with_key(&args, "zfs change-key", key).await?;
+        if !status.success() {
+            return Err(io::Error::other(format!("zfs change-key failed: {status}")));
+        }
+        Ok(())
+    }
+
     async fn create(&self, key: &str, args: &[String]) -> io::Result<()> {
         let args = [
             "create",
@@ -168,12 +184,21 @@ pub(crate) mod testutils {
     /// ZFS implementation that returns predefined results for expected requests.
     #[derive(Default)]
     pub(crate) struct MockZfs {
+        change_key: RefCell<VecDeque<WithKeyMock>>,
         create: RefCell<VecDeque<WithKeyMock>>,
         key_status: RefCell<VecDeque<KeyStatusMock>>,
         load_key: RefCell<VecDeque<LoadKeyMock>>,
     }
 
     impl MockZfs {
+        /// Records an expected change-key request and its result.
+        pub(crate) fn add_change_key(&self, key: &str, args: &[&str], result: io::Result<()>) {
+            self.change_key.borrow_mut().push_back((
+                (key.to_owned(), args.iter().map(|arg| (*arg).to_owned()).collect()),
+                result,
+            ));
+        }
+
         /// Records an expected create request and its result.
         pub(crate) fn add_create(&self, key: &str, args: &[&str], result: io::Result<()>) {
             self.create.borrow_mut().push_back((
@@ -195,6 +220,7 @@ pub(crate) mod testutils {
 
     impl Drop for MockZfs {
         fn drop(&mut self) {
+            assert!(self.change_key.borrow().is_empty(), "Mock requests not fully consumed");
             assert!(self.create.borrow().is_empty(), "Mock requests not fully consumed");
             assert!(self.key_status.borrow().is_empty(), "Mock requests not fully consumed");
             assert!(self.load_key.borrow().is_empty(), "Mock requests not fully consumed");
@@ -202,6 +228,13 @@ pub(crate) mod testutils {
     }
 
     impl Zfs for MockZfs {
+        async fn change_key(&self, key: &str, args: &[String]) -> io::Result<()> {
+            let mock = self.change_key.borrow_mut().pop_front().expect("No mock request available");
+            assert_eq!(mock.0.0, key);
+            assert_eq!(mock.0.1, args);
+            mock.1
+        }
+
         async fn create(&self, key: &str, args: &[String]) -> io::Result<()> {
             let mock = self.create.borrow_mut().pop_front().expect("No mock request available");
             assert_eq!(mock.0.0, key);

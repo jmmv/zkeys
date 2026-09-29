@@ -42,6 +42,7 @@ Commands:
     help                show command-line usage information
     keep-alive          periodically keep keys alive
     version             show version information
+    zfs-change-key      change a ZFS encryption key
     zfs-create          create an encrypted ZFS dataset
     zfs-load-key        load a key for a ZFS dataset
 
