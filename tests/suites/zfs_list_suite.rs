@@ -1,0 +1,127 @@
+// zkeys
+// Copyright 2026 Julio Merino.
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+// * Redistributions of source code must retain the above copyright
+//   notice, this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright
+//   notice, this list of conditions and the following disclaimer in the
+//   documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+//! Integration tests for the `zfs-list` command.
+
+use crate::common::zkeys;
+use std::fs;
+use tempfile::NamedTempFile;
+
+#[test]
+fn test_zfs_list() {
+    let config = NamedTempFile::new().unwrap();
+    fs::write(
+        config.path(),
+        r#"
+[keys.first]
+id = "00000000-0000-0000-0000-000000000001"
+remote_password = "password"
+local_secret = "secret"
+
+[keys.second]
+id = "00000000-0000-0000-0000-000000000002"
+remote_password = "password"
+local_secret = "secret"
+
+[zfs."pool/zulu"]
+key = "second"
+
+[zfs."pool/alpha"]
+key = "first"
+"#,
+    )
+    .unwrap();
+
+    zkeys()
+        .args(["zfs-list", "--config-file"])
+        .arg(config.path())
+        .assert()
+        .code(0)
+        .stdout("pool/alpha first\npool/zulu second\n")
+        .stderr("");
+}
+
+#[test]
+fn test_zfs_list_invalid_config() {
+    let config = NamedTempFile::new().unwrap();
+    fs::write(config.path(), "this is not = valid TOML =").unwrap();
+
+    let output = zkeys().args(["zfs-list", "--config-file"]).arg(config.path()).output().unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert_eq!(Some(1), output.status.code());
+    assert_eq!("", String::from_utf8(output.stdout).unwrap());
+    assert!(stderr.starts_with(&format!(
+        "zkeys: Failed to load configuration file {}: ",
+        config.path().display()
+    )));
+    assert!(stderr.contains("TOML parse error"));
+}
+
+#[test]
+fn test_zfs_list_unknown_key() {
+    let config = NamedTempFile::new().unwrap();
+    fs::write(config.path(), "[zfs.dataset]\nkey = \"missing\"\n").unwrap();
+
+    zkeys()
+        .args(["zfs-list", "--config-file"])
+        .arg(config.path())
+        .assert()
+        .code(1)
+        .stdout("")
+        .stderr(format!(
+            "zkeys: Failed to load configuration file {}: ZFS dataset dataset references undefined key missing\n",
+            config.path().display()
+        ));
+}
+
+#[test]
+fn test_zfs_list_extra_argument() {
+    zkeys().args(["zfs-list", "dataset"]).assert().code(2).stdout("").stderr(
+        "Usage error: Too many arguments
+Type `zkeys help` or `man 8 zkeys` for more information
+",
+    );
+}
+
+#[test]
+fn test_zfs_list_help() {
+    zkeys()
+        .args(["help", "zfs-list"])
+        .assert()
+        .code(0)
+        .stdout(
+            r#"Usage: zkeys zfs-list [options]
+
+Options:
+    --config-file FILE  path to the configuration file (default:
+                        /non-existent/prefix/etc/zkeys.toml)
+
+zkeys home page: https://zkeys.jmmv.dev/
+"#,
+        )
+        .stderr("");
+}
