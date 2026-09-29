@@ -29,6 +29,7 @@
 use anyhow::Context;
 use getoptsargs::prelude::*;
 use std::env;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use zkeys::*;
 
@@ -58,66 +59,64 @@ impl Paths {
     }
 }
 
+/// Adds the configuration file option to a command.
+fn config_setup(builder: CommandBuilder) -> CommandBuilder {
+    let paths = Paths::default();
+    builder.optopt(
+        "",
+        "config-file",
+        &format!("path to the configuration file (default: {})", paths.config_file.display()),
+        "FILE",
+    )
+}
+
+/// Loads the configuration selected by a command's options.
+fn load_config(matches: &Matches) -> Result<Config> {
+    let paths = Paths::default().with_overrides(matches);
+    Config::parse(&paths.config_file).with_context(|| {
+        format!("Failed to load configuration file {}", paths.config_file.display())
+    })
+}
+
 /// Adds the positional arguments for the `get-key` command.
 fn get_key_setup(builder: CommandBuilder) -> CommandBuilder {
-    let paths = Paths::default();
-    builder
-        .optopt(
-            "",
-            "config-file",
-            &format!("path to the configuration file (default: {})", paths.config_file.display()),
-            "FILE",
-        )
-        .posarg("name", "name of the key to retrieve")
+    config_setup(builder).posarg("name", "name of the key to retrieve")
 }
 
 /// Runs the `get-key` command.
 async fn get_key_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
     init_env_logger(env!("CARGO_BIN_NAME"));
-    let paths = Paths::default().with_overrides(&command_matches);
-    let config = Config::parse(&paths.config_file).with_context(|| {
-        format!("Failed to load configuration file {}", paths.config_file.display())
-    })?;
+    let config = load_config(&command_matches)?;
     get_key(config, command_matches.arg_pos("name")).await?;
     Ok(0)
 }
 
 /// Adds the options and arguments for the `keep-alive` command.
 fn keep_alive_setup(builder: CommandBuilder) -> CommandBuilder {
-    let paths = Paths::default();
-    builder
-        .optopt(
-            "",
-            "config-file",
-            &format!("path to the configuration file (default: {})", paths.config_file.display()),
-            "FILE",
-        )
-        .trailarg("name", 0, usize::MAX, "names of the keys to keep alive (default: all)")
+    config_setup(builder).trailarg(
+        "name",
+        0,
+        usize::MAX,
+        "names of the keys to keep alive (default: all)",
+    )
 }
 
 /// Runs the `keep-alive` command.
 async fn keep_alive_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    let paths = Paths::default().with_overrides(&command_matches);
-    let config = Config::parse(&paths.config_file).with_context(|| {
-        format!("Failed to load configuration file {}", paths.config_file.display())
-    })?;
+    let config = load_config(&command_matches)?;
     keep_alive(config, command_matches.arg_trail()).await?;
     Ok(0)
 }
 
 /// Adds the options and arguments for the `zfs-load-key` command.
 fn zfs_load_key_setup(builder: CommandBuilder) -> CommandBuilder {
-    let paths = Paths::default();
-    builder
-        .optflag("a", "all", "load keys for all configured ZFS datasets")
-        .optopt(
-            "",
-            "config-file",
-            &format!("path to the configuration file (default: {})", paths.config_file.display()),
-            "FILE",
-        )
-        .trailarg("dataset", 0, 1, "ZFS dataset whose key to load")
+    config_setup(builder.optflag("a", "all", "load keys for all configured ZFS datasets")).trailarg(
+        "dataset",
+        0,
+        1,
+        "ZFS dataset whose key to load",
+    )
 }
 
 /// Runs the `zfs-load-key` command.
@@ -136,11 +135,29 @@ async fn zfs_load_key_main(_app_matches: Matches, command_matches: Matches) -> R
         }
     };
 
-    let paths = Paths::default().with_overrides(&command_matches);
-    let config = Config::parse(&paths.config_file).with_context(|| {
-        format!("Failed to load configuration file {}", paths.config_file.display())
-    })?;
+    let config = load_config(&command_matches)?;
     zfs_load_key(config, dataset).await?;
+    Ok(0)
+}
+
+/// Prints additional help for commands that forward arguments to ZFS.
+fn zfs_extra_help(writer: &mut dyn Write) -> io::Result<()> {
+    writeln!(writer, "The final zfs-arg is the configured ZFS dataset name.")?;
+    writeln!(writer, "Pass `--` before zfs-arg arguments that begin with a hyphen.")
+}
+
+/// Adds the common options and arguments for a ZFS command that receives a key.
+fn zfs_key_input_setup(builder: CommandBuilder) -> CommandBuilder {
+    config_setup(builder.optflag("", "quiet", "do not print the full key after success"))
+        .trailarg("zfs-arg", 1, usize::MAX, "arguments to pass to zfs")
+        .extra_help(zfs_extra_help)
+}
+
+/// Runs the `zfs-create` command.
+async fn zfs_create_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    init_env_logger(env!("CARGO_BIN_NAME"));
+    let config = load_config(&command_matches)?;
+    zfs_create(config, command_matches.opt_present("quiet"), command_matches.arg_trail()).await?;
     Ok(0)
 }
 
@@ -153,6 +170,12 @@ fn app_setup(builder: Builder) -> Builder {
         .manpage(env!("CARGO_BIN_NAME"), "8")
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)
         .cmd_async("keep-alive", "periodically keep keys alive", keep_alive_setup, keep_alive_main)
+        .cmd_async(
+            "zfs-create",
+            "create an encrypted ZFS dataset",
+            zfs_key_input_setup,
+            zfs_create_main,
+        )
         .cmd_async(
             "zfs-load-key",
             "load a key for a ZFS dataset",

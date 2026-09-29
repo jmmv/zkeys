@@ -26,9 +26,9 @@
 
 //! Utilities to call into the `zfs` tool.
 
-use log::info;
+use log::{info, warn};
 use std::io;
-use std::process::{ExitStatus, Stdio};
+use std::process::{ExitStatus, Output, Stdio};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
@@ -41,6 +41,9 @@ pub(crate) enum KeyStatus {
 
 /// Interface to the ZFS command-line utility.
 pub(crate) trait Zfs {
+    /// Creates an encrypted dataset using `key`.
+    async fn create(&self, key: &str, args: &[String]) -> io::Result<()>;
+
     /// Returns the key status of `dataset`.
     async fn key_status(&self, dataset: &str) -> io::Result<KeyStatus>;
 
@@ -52,7 +55,7 @@ pub(crate) trait Zfs {
 pub(crate) struct CommandZfs;
 
 /// Builds an error for an unsuccessful ZFS subprocess.
-fn command_error(operation: &str, output: std::process::Output) -> io::Error {
+fn command_error(operation: &str, output: Output) -> io::Error {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr = stderr.trim();
     let message = if stderr.is_empty() {
@@ -61,6 +64,15 @@ fn command_error(operation: &str, output: std::process::Output) -> io::Error {
         format!("{operation} failed: {stderr}")
     };
     io::Error::other(message)
+}
+
+/// Warns the user to back up the full key.
+pub(crate) fn print_key_warning(secret: &str) {
+    warn!("THIS IS YOUR FULL KEY:");
+    warn!("");
+    warn!("    {secret}");
+    warn!("");
+    warn!("BACK IT UP NOW.");
 }
 
 /// Runs a ZFS operation and provides `key` on its standard input.
@@ -87,6 +99,27 @@ async fn run_with_key(args: &[String], operation: &str, key: &str) -> io::Result
 }
 
 impl Zfs for CommandZfs {
+    async fn create(&self, key: &str, args: &[String]) -> io::Result<()> {
+        let args = [
+            "create",
+            "-o",
+            "encryption=on",
+            "-o",
+            "keyformat=passphrase",
+            "-o",
+            "keylocation=prompt",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .chain(args.iter().cloned())
+        .collect::<Vec<_>>();
+        let status = run_with_key(&args, "zfs create", key).await?;
+        if !status.success() {
+            return Err(io::Error::other(format!("zfs create failed: {status}")));
+        }
+        Ok(())
+    }
+
     async fn key_status(&self, dataset: &str) -> io::Result<KeyStatus> {
         let output = Command::new("zfs")
             .args(["get", "-H", "-o", "value", "keystatus", dataset])
@@ -130,15 +163,25 @@ pub(crate) mod testutils {
 
     type KeyStatusMock = (String, io::Result<KeyStatus>);
     type LoadKeyMock = ((String, String), io::Result<()>);
+    type WithKeyMock = ((String, Vec<String>), io::Result<()>);
 
     /// ZFS implementation that returns predefined results for expected requests.
     #[derive(Default)]
     pub(crate) struct MockZfs {
+        create: RefCell<VecDeque<WithKeyMock>>,
         key_status: RefCell<VecDeque<KeyStatusMock>>,
         load_key: RefCell<VecDeque<LoadKeyMock>>,
     }
 
     impl MockZfs {
+        /// Records an expected create request and its result.
+        pub(crate) fn add_create(&self, key: &str, args: &[&str], result: io::Result<()>) {
+            self.create.borrow_mut().push_back((
+                (key.to_owned(), args.iter().map(|arg| (*arg).to_owned()).collect()),
+                result,
+            ));
+        }
+
         /// Records an expected key-status request and its result.
         pub(crate) fn add_key_status(&self, dataset: &str, result: io::Result<KeyStatus>) {
             self.key_status.borrow_mut().push_back((dataset.to_owned(), result));
@@ -152,12 +195,20 @@ pub(crate) mod testutils {
 
     impl Drop for MockZfs {
         fn drop(&mut self) {
+            assert!(self.create.borrow().is_empty(), "Mock requests not fully consumed");
             assert!(self.key_status.borrow().is_empty(), "Mock requests not fully consumed");
             assert!(self.load_key.borrow().is_empty(), "Mock requests not fully consumed");
         }
     }
 
     impl Zfs for MockZfs {
+        async fn create(&self, key: &str, args: &[String]) -> io::Result<()> {
+            let mock = self.create.borrow_mut().pop_front().expect("No mock request available");
+            assert_eq!(mock.0.0, key);
+            assert_eq!(mock.0.1, args);
+            mock.1
+        }
+
         async fn key_status(&self, dataset: &str) -> io::Result<KeyStatus> {
             let mock = self.key_status.borrow_mut().pop_front().expect("No mock request available");
             assert_eq!(mock.0, dataset);

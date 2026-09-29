@@ -82,8 +82,12 @@ Each key is declared in a
 .Va keys . Ns Ar name
 table, where
 .Ar name
-is the local name passed to
-.Cm zkeys get-key .
+is the local name passed to the get-key and keep-alive commands or referenced
+by the
+.Va key
+setting in a
+.Va zfs
+table.
 Each table must contain the following settings:
 .Bl -tag -width XXXX
 .It Va id
@@ -101,6 +105,8 @@ table, where
 .Ar dataset
 is the dataset name and must be quoted if it contains a slash.
 These entries map datasets to keys so that commands such as
+.Cm zkeys zfs-create
+or
 .Cm zkeys zfs-load-key
 can operate on them automatically.
 .Pp

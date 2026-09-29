@@ -69,7 +69,7 @@ pub struct Key {
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct ZfsDataset {
-    /// Name of the key used to unlock the dataset.
+    /// Name of the key used to encrypt and unlock the dataset.
     pub key: String,
 }
 

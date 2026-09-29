@@ -39,6 +39,12 @@
 .Op Fl -config-file Ar file
 .Op Ar name1 .. nameN
 .Nm
+.Cm zfs-create
+.Op Fl -config-file Ar file
+.Op Fl -quiet
+.Op Ar zfs-arg1 ..
+.Ar zfs-argN
+.Nm
 .Cm zfs-load-key
 .Op Fl -config-file Ar file
 .Fl a | Ar dataset
@@ -102,6 +108,51 @@ Path to the configuration file.
 .Pp
 Default:
 .Pa @PREFIX@/etc/zkeys.toml
+.El
+.Ss The zfs-create command
+The zfs-create command retrieves the key associated with the ZFS dataset named
+by the final
+.Ar zfs-arg
+and provides it to the standard input of the following command:
+.Bd -literal -offset indent
+zfs create \e
+    -o encryption=on \e
+    -o keyformat=passphrase \e
+    -o keylocation=prompt \e
+    zfs-arg1 .. zfs-argN
+.Ed
+.Pp
+The
+.Ar zfs-arg
+values are passed to
+.Xr zfs 8
+without interpretation.
+The final argument must name a ZFS dataset in the configuration file.
+Specify
+.Ql --
+before these arguments so that options intended for
+.Xr zfs 8
+are not interpreted as options to
+.Nm .
+.Pp
+After
+.Xr zfs 8
+exits successfully, this prints the full key to stderr with a warning about
+the requirement to back it up, unless
+.Fl -quiet
+was specified.
+.Pp
+The following options are supported:
+.Bl -tag -width XXXX
+.It Fl -config-file Ar file
+Path to the configuration file.
+.Pp
+Default:
+.Pa @PREFIX@/etc/zkeys.toml
+.It Fl -quiet
+Do not print the full key after
+.Xr zfs 8
+exits successfully.
 .El
 .Ss The zfs-load-key command
 The zfs-load-key command retrieves a configured key and loads it into the ZFS
