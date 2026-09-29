@@ -30,7 +30,7 @@ use crate::Config;
 use crate::get_key::get_key_internal;
 use crate::service::{HttpService, Service};
 use crate::zfs::{CommandZfs, KeyStatus, Zfs};
-use log::{info, warn};
+use log::warn;
 use std::io;
 
 /// Loads the key for one configured ZFS dataset.
@@ -53,7 +53,6 @@ async fn load_one<S: Service, Z: Zfs>(
             Ok(())
         }
         KeyStatus::Unavailable => {
-            info!("Loading key for {dataset}");
             let key = get_key_internal(&config.keys, &mapping.key, service).await?;
             zfs.load_key(dataset, &key).await
         }

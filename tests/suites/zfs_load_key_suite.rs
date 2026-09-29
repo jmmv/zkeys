@@ -184,7 +184,7 @@ async fn test_loads_key_without_newline() {
     assert_eq!(Some(0), output.status.code());
     assert_eq!(b"", output.stdout.as_slice());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert_eq!("zkeys: INFO: Loading key for pool/test\n", stderr);
+    assert_eq!("zkeys: INFO: Running: zfs load-key -L prompt pool/test\n", stderr);
 
     assert_eq!(
         "get -H -o value keystatus pool/test
@@ -217,8 +217,9 @@ async fn test_load_failure_does_not_expose_key() {
     assert_eq!(b"", output.stdout.as_slice());
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(
-        "zkeys: INFO: Loading key for pool/test
-zkeys: zfs load-key for pool/test failed: Injected load failure
+        "zkeys: INFO: Running: zfs load-key -L prompt pool/test
+Injected load failure
+zkeys: zfs load-key for pool/test failed with exit status: 1
 ",
         stderr
     );
