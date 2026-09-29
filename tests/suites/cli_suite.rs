@@ -41,6 +41,7 @@ Commands:
     get-key             retrieve a key
     help                show command-line usage information
     keep-alive          periodically keep keys alive
+    list-keys           list configured keys
     version             show version information
     zfs-change-key      change a ZFS encryption key
     zfs-create          create an encrypted ZFS dataset

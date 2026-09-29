@@ -78,6 +78,22 @@ fn load_config(matches: &Matches) -> Result<Config> {
     })
 }
 
+/// Adds the options for the `list-keys` command.
+fn list_keys_setup(builder: CommandBuilder) -> CommandBuilder {
+    config_setup(builder)
+}
+
+/// Runs the `list-keys` command.
+async fn list_keys_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    let config = load_config(&command_matches)?;
+    let mut keys: Vec<_> = config.keys.keys().collect();
+    keys.sort();
+    for key in keys {
+        println!("{key}");
+    }
+    Ok(0)
+}
+
 /// Adds the positional arguments for the `get-key` command.
 fn get_key_setup(builder: CommandBuilder) -> CommandBuilder {
     config_setup(builder).posarg("name", "name of the key to retrieve")
@@ -178,6 +194,7 @@ fn app_setup(builder: Builder) -> Builder {
         .homepage(env!("CARGO_PKG_HOMEPAGE"))
         .manpage(env!("CARGO_BIN_NAME"), "8")
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)
+        .cmd_async("list-keys", "list configured keys", list_keys_setup, list_keys_main)
         .cmd_async("keep-alive", "periodically keep keys alive", keep_alive_setup, keep_alive_main)
         .cmd_async(
             "zfs-change-key",
