@@ -45,6 +45,7 @@ Commands:
     version             show version information
     zfs-change-key      change a ZFS encryption key
     zfs-create          create an encrypted ZFS dataset
+    zfs-list            list configured ZFS datasets
     zfs-load-key        load a key for a ZFS dataset
 
 zkeys home page: https://zkeys.jmmv.dev/

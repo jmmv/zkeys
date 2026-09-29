@@ -54,6 +54,9 @@
 .Op Ar zfs-arg1 ..
 .Ar zfs-argN
 .Nm
+.Cm zfs-list
+.Op Fl -config-file Ar file
+.Nm
 .Cm zfs-load-key
 .Op Fl -config-file Ar file
 .Fl a | Ar dataset
@@ -242,6 +245,20 @@ The command tries to make as much progress even if a key cannot be loaded, but
 reports an error if any key fails to load.
 This option cannot be combined with a dataset argument and fails if no ZFS
 datasets are configured.
+.It Fl -config-file Ar file
+Path to the configuration file.
+.Pp
+Default:
+.Pa @PREFIX@/etc/zkeys.toml
+.El
+.Ss The zfs-list command
+The zfs-list command prints the ZFS datasets in the configuration file and the
+keys associated with them.
+Each line contains a dataset name, one space, and its key name.
+The lines are sorted lexicographically by dataset name.
+.Pp
+The following option is supported:
+.Bl -tag -width XXXX
 .It Fl -config-file Ar file
 Path to the configuration file.
 .Pp

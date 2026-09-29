@@ -94,6 +94,22 @@ async fn list_keys_main(_app_matches: Matches, command_matches: Matches) -> Resu
     Ok(0)
 }
 
+/// Adds the options for the `zfs-list` command.
+fn zfs_list_setup(builder: CommandBuilder) -> CommandBuilder {
+    config_setup(builder)
+}
+
+/// Runs the `zfs-list` command.
+async fn zfs_list_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    let config = load_config(&command_matches)?;
+    let mut datasets: Vec<_> = config.zfs.iter().collect();
+    datasets.sort_by_key(|(dataset, _)| *dataset);
+    for (dataset, zfs) in datasets {
+        println!("{dataset} {}", zfs.key);
+    }
+    Ok(0)
+}
+
 /// Adds the positional arguments for the `get-key` command.
 fn get_key_setup(builder: CommandBuilder) -> CommandBuilder {
     config_setup(builder).posarg("name", "name of the key to retrieve")
@@ -214,6 +230,7 @@ fn app_setup(builder: Builder) -> Builder {
             zfs_load_key_setup,
             zfs_load_key_main,
         )
+        .cmd_async("zfs-list", "list configured ZFS datasets", zfs_list_setup, zfs_list_main)
 }
 
 tokio_app!("zkeys", app_setup, tokio_command_dispatcher);
