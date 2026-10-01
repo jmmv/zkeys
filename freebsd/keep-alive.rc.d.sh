@@ -35,21 +35,27 @@ name="zkeys_keep_alive"
 desc="The ZKeys keep-alive service"
 command="daemon"
 rcvar="zkeys_keep_alive_enable"
-pidfile="/var/run/${name}.pid"
+pidfile="/var/run/zkeys-keep-alive.pid"
 start_cmd="zkeys_keep_alive_start"
 required_files="/usr/local/etc/zkeys.toml /usr/local/sbin/zkeys"
 
 zkeys_keep_alive_start()
 {
-    if [ ! -f /var/log/${name}.log ]; then
-        touch /var/log/${name}.log
-        chmod 600 /var/log/${name}.log
-        chown root:wheel /var/log/${name}.log
+    if [ ! -f /var/log/zkeys-keep-alive.log ]; then
+        touch /var/log/zkeys-keep-alive.log
+        chmod 600 /var/log/zkeys-keep-alive.log
+        chown root:wheel /var/log/zkeys-keep-alive.log
     fi
 
-    echo "Starting ${name}."
-    daemon -P "${pidfile}" -o /var/log/${name}.log -H -t "${name}" \
-        /usr/local/sbin/zkeys keep-alive --config-file /usr/local/etc/zkeys.toml
+    echo "Starting zkeys-keep-alive."
+    daemon \
+        -P "${pidfile}" \
+        -o /var/log/zkeys-keep-alive.log \
+        -H \
+        -t "zkeys-keep-alive" \
+        /usr/local/sbin/zkeys \
+        keep-alive \
+        --config-file /usr/local/etc/zkeys.toml
 }
 
 load_rc_config $name

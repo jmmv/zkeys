@@ -49,10 +49,10 @@ If you are on FreeBSD (the primary target of this project), make sure to use
 
     ```sh
     sysrc zkeys_keep_alive_enable=YES
-    service zkeys_keep_alive start
+    service zkeys-keep-alive start
     ```
 
-1.  Review `/var/log/zkeys_keep_alive.log` and confirm that the log mentions
+1.  Review `/var/log/zkeys-keep-alive.log` and confirm that the log mentions
     that your keys are being kept alive successfully.  (The keys may have
     been auto-locked before reaching this step, so if you see errors, first
     check that the key is unlocked in the dashboard.)
@@ -69,7 +69,7 @@ If you are on FreeBSD (the primary target of this project), make sure to use
 
     ```sh
     sysrc zkeys_mount_all_enable=YES
-    service zkeys_mount_all start
+    service zkeys-mount-all start
     ```
 
     The service loads all configured ZFS keys, mounts all available datasets,
