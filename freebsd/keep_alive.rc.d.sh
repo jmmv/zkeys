@@ -26,12 +26,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# PROVIDE: zkeys_keep_alive
+# PROVIDE: zkeys-keep-alive
 # REQUIRE: NETWORKING
 
 . /etc/rc.subr
 
-name="zkeys_keep_alive"
+name="zkeys-keep-alive"
 desc="The ZKeys keep-alive service"
 command="daemon"
 rcvar="zkeys_keep_alive_enable"

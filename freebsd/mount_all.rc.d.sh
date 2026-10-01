@@ -26,12 +26,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# PROVIDE: zkeys_mount_all
-# REQUIRE: NETWORKING zkeys_keep_alive zpool
+# PROVIDE: zkeys-mount-all
+# REQUIRE: NETWORKING zkeys-keep-alive zpool
 
 . /etc/rc.subr
 
-name="zkeys_mount_all"
+name="zkeys-mount-all"
 desc="The ZKeys ZFS mounting service"
 rcvar="zkeys_mount_all_enable"
 start_cmd="zkeys_mount_all_start"
