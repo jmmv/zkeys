@@ -33,8 +33,8 @@
             zkeys.conf type=file mode=0644
         ..
         rc.d type=dir mode=0755
-            zkeys_keep_alive type=file mode=0755
-            zkeys_mount_all type=file mode=0755
+            zkeys-keep-alive type=file mode=0755
+            zkeys-mount-all type=file mode=0755
         ..
         zkeys.toml.tmpl type=file mode=0600
     ..
