@@ -68,6 +68,15 @@ pass_filenames = false
 always_run = true
 
 [[repos.hooks]]
+id = "cargo-no-openssl"
+name = "Check for OpenSSL dependencies"
+language = "system"
+entry = "sh"
+args = ["-c", 'if cargo tree -i openssl >/dev/null 2>&1; then cargo tree -i openssl; echo "OpenSSL dependencies are not allowed" >&2; exit 1; fi']
+files = "^Cargo\\.(toml|lock)$"
+pass_filenames = false
+
+[[repos.hooks]]
 id = "shellcheck"
 name = "Check shell scripts"
 language = "system"
