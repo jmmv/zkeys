@@ -18,19 +18,19 @@ jobs:
               run: |
                   sudo apt update
                   sudo apt install --yes mtree-netbsd
-            - name: Install
+            - name: Install for FreeBSD
               env:
                   PREFIX: ${{ runner.temp }}/zkeys-prefix
-              run: make install PREFIX="${PREFIX}"
-            - name: Verify installed layout
-              env:
-                  PREFIX: ${{ runner.temp }}/zkeys-prefix
-              run: mtree -f install.mtree -p "${PREFIX}"
-            - name: Install with DESTDIR
-              env:
-                  DESTDIR: ${{ runner.temp }}/zkeys-prefix
-              run: make install DESTDIR="${DESTDIR}"
-            - name: Verify DESTDIR installed layout
+                  ZKEYS_TEST_INSTALL_FLAVOR: freebsd
+              run: |
+                  make PREFIX="${PREFIX}"
+                  make install PREFIX="${PREFIX}"
+                  mtree -f freebsd/install.mtree -p "${PREFIX}"
+            - name: Install for FreeBSD with DESTDIR
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-prefix
-              run: mtree -f install.mtree -p "${DESTDIR}/usr/local"
+                  ZKEYS_TEST_INSTALL_FLAVOR: freebsd
+              run: |
+                  make
+                  make install DESTDIR="${DESTDIR}"
+                  mtree -f freebsd/install.mtree -p "${DESTDIR}/usr/local"
