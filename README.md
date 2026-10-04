@@ -36,8 +36,9 @@ This installs to `/usr/local` by default.  To use another prefix, pass it to
 $ make install PREFIX=/opt/local
 ```
 
-If you are on FreeBSD (the primary target of this project), make sure to use
-`gmake` for proper behavior.
+Note that `make install` does different things depending on the host OS because
+it sets up all the integration points for automatic key unlocking at boot time
+and installs periodic key keep-alives throughout the system's uptime.
 
 ## FreeBSD setup
 

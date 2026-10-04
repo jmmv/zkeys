@@ -27,20 +27,23 @@
 
 set -eu
 
-readonly PREFIX="${1:?Must specify a PREFIX}"
+PREFIX="${DESTDIR:-}${1:-/usr/local}"
 
-flavor="${ZKEYS_TEST_INSTALL_FLAVOR:-}"
-if [ -z "${flavor}" ]; then
-    case "$(uname -s)" in
-    FreeBSD)
-        flavor=freebsd
-        ;;
+install() {
+    echo "install ${*}" 1>&2
+    command install "${@}"
+}
 
-    *)
-        echo "Cannot determine installer for this system" 1>&2
-        exit 1
-        ;;
-    esac
-fi
-
-exec "./${flavor}/install.sh" "${PREFIX}"
+install -m 755 -d "${PREFIX}/sbin"
+install -m 755 target/release/zkeys "${PREFIX}/sbin/zkeys"
+install -m 755 -d "${PREFIX}/etc"
+install -m 600 zkeys.toml.tmpl "${PREFIX}/etc/zkeys.toml.tmpl"
+install -m 755 -d "${PREFIX}/etc/newsyslog.conf.d"
+install -m 644 freebsd/newsyslog.conf "${PREFIX}/etc/newsyslog.conf.d/zkeys.conf"
+install -m 755 -d "${PREFIX}/etc/rc.d"
+install -m 755 freebsd/keep-alive.rc.d.sh "${PREFIX}/etc/rc.d/zkeys-keep-alive"
+install -m 755 freebsd/mount-all.rc.d.sh "${PREFIX}/etc/rc.d/zkeys-mount-all"
+install -m 755 -d "${PREFIX}/share/man/man5"
+install -m 644 man/zkeys.toml.5 "${PREFIX}/share/man/man5/zkeys.toml.5"
+install -m 755 -d "${PREFIX}/share/man/man8"
+install -m 644 target/zkeys.8 "${PREFIX}/share/man/man8/zkeys.8"
