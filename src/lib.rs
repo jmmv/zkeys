@@ -40,3 +40,5 @@ mod zfs_create;
 pub use zfs_create::zfs_create;
 mod zfs_load_key;
 pub use zfs_load_key::zfs_load_key;
+mod zpool_create;
+pub use zpool_create::zpool_create;

@@ -185,6 +185,19 @@ fn zfs_key_input_setup(builder: CommandBuilder) -> CommandBuilder {
         .extra_help(zfs_extra_help)
 }
 
+/// Prints additional help for the `zpool-create` command.
+fn zpool_extra_help(writer: &mut dyn Write) -> io::Result<()> {
+    writeln!(writer, "The pool name after zpool options must be a configured ZFS dataset.")?;
+    writeln!(writer, "Pass `--` before zpool-arg arguments that begin with a hyphen.")
+}
+
+/// Adds the options and arguments for the `zpool-create` command.
+fn zpool_create_setup(builder: CommandBuilder) -> CommandBuilder {
+    config_setup(builder.optflag("", "quiet", "do not print the full key after success"))
+        .trailarg("zpool-arg", 1, usize::MAX, "arguments to pass to zpool")
+        .extra_help(zpool_extra_help)
+}
+
 /// Runs the `zfs-change-key` command.
 async fn zfs_change_key_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
     init_env_logger(env!("CARGO_BIN_NAME"));
@@ -199,6 +212,14 @@ async fn zfs_create_main(_app_matches: Matches, command_matches: Matches) -> Res
     init_env_logger(env!("CARGO_BIN_NAME"));
     let config = load_config(&command_matches)?;
     zfs_create(config, command_matches.opt_present("quiet"), command_matches.arg_trail()).await?;
+    Ok(0)
+}
+
+/// Runs the `zpool-create` command.
+async fn zpool_create_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    init_env_logger(env!("CARGO_BIN_NAME"));
+    let config = load_config(&command_matches)?;
+    zpool_create(config, command_matches.opt_present("quiet"), command_matches.arg_trail()).await?;
     Ok(0)
 }
 
@@ -231,6 +252,12 @@ fn app_setup(builder: Builder) -> Builder {
             zfs_load_key_main,
         )
         .cmd_async("zfs-list", "list configured ZFS datasets", zfs_list_setup, zfs_list_main)
+        .cmd_async(
+            "zpool-create",
+            "create an encrypted ZFS pool",
+            zpool_create_setup,
+            zpool_create_main,
+        )
 }
 
 tokio_app!("zkeys", app_setup, tokio_command_dispatcher);
