@@ -23,7 +23,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd September 29, 2026
+.Dd October 6, 2026
 .Dt ZKEYS 8
 .Os
 .Sh NAME
@@ -60,6 +60,12 @@
 .Cm zfs-load-key
 .Op Fl -config-file Ar file
 .Fl a | Ar dataset
+.Nm
+.Cm zpool-create
+.Op Fl -config-file Ar file
+.Op Fl -quiet
+.Op Ar zpool-arg1 ..
+.Ar zpool-argN
 .Nm
 .Cm help
 .Op Ar command
@@ -220,6 +226,56 @@ Default:
 .It Fl -quiet
 Do not print the full key after
 .Xr zfs 8
+exits successfully.
+.El
+.Ss The zpool-create command
+The zpool-create command retrieves the key associated with the root ZFS file
+system of the pool named in the
+.Ar zpool-arg
+arguments and provides it to the standard input of the following command:
+.Bd -literal -offset indent
+zpool create \e
+    -O encryption=on \e
+    -O keyformat=passphrase \e
+    -O keylocation=prompt \e
+    zpool-arg1 .. zpool-argN
+.Ed
+.Pp
+The
+.Fl O
+options set file system properties on the pool's root file system so that
+descendant file systems inherit encryption by default.
+The
+.Ar zpool-arg
+values are passed to
+.Xr zpool 8
+without modification.
+The pool name following the
+.Cm zpool create
+options must be a ZFS dataset in the configuration file.
+Specify
+.Ql --
+before these arguments so that options intended for
+.Xr zpool 8
+are not interpreted as options to
+.Nm .
+After
+.Xr zpool 8
+exits successfully, this prints the full key to stderr with a warning about
+the requirement to back it up, unless
+.Fl -quiet
+was specified.
+.Pp
+The following options are supported:
+.Bl -tag -width XXXX
+.It Fl -config-file Ar file
+Path to the configuration file.
+.Pp
+Default:
+.Pa @PREFIX@/etc/zkeys.toml
+.It Fl -quiet
+Do not print the full key after
+.Xr zpool 8
 exits successfully.
 .El
 .Ss The zfs-load-key command

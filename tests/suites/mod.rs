@@ -34,3 +34,4 @@ pub(crate) mod zfs_change_key_suite;
 pub(crate) mod zfs_create_suite;
 pub(crate) mod zfs_list_suite;
 pub(crate) mod zfs_load_key_suite;
+pub(crate) mod zpool_create_suite;

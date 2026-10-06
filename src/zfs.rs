@@ -79,9 +79,14 @@ pub(crate) fn print_key_warning(secret: &str) {
 }
 
 /// Runs a ZFS operation and provides `key` on its standard input.
-async fn run_with_key(args: &[String], operation: &str, key: &str) -> io::Result<ExitStatus> {
-    info!("Running: zfs {}", args.to_vec().join(" "));
-    let mut command = Command::new("zfs");
+pub(crate) async fn run_with_key(
+    program: &str,
+    args: &[String],
+    operation: &str,
+    key: &str,
+) -> io::Result<ExitStatus> {
+    info!("Running: {program} {}", args.join(" "));
+    let mut command = Command::new(program);
     command.args(args);
     command.stdin(Stdio::piped());
     let mut child = command.spawn().map_err(|error| {
@@ -108,7 +113,7 @@ impl Zfs for CommandZfs {
             .map(str::to_owned)
             .chain(args.iter().cloned())
             .collect::<Vec<_>>();
-        let status = run_with_key(&args, "zfs change-key", key).await?;
+        let status = run_with_key("zfs", &args, "zfs change-key", key).await?;
         if !status.success() {
             return Err(io::Error::other(format!("zfs change-key failed: {status}")));
         }
@@ -129,7 +134,7 @@ impl Zfs for CommandZfs {
         .map(str::to_owned)
         .chain(args.iter().cloned())
         .collect::<Vec<_>>();
-        let status = run_with_key(&args, "zfs create", key).await?;
+        let status = run_with_key("zfs", &args, "zfs create", key).await?;
         if !status.success() {
             return Err(io::Error::other(format!("zfs create failed: {status}")));
         }
@@ -163,7 +168,7 @@ impl Zfs for CommandZfs {
     async fn load_key(&self, dataset: &str, key: &str) -> io::Result<()> {
         let args = ["load-key", "-L", "prompt", dataset].map(str::to_owned);
         let operation = format!("zfs load-key for {dataset}");
-        let status = run_with_key(&args, &operation, key).await?;
+        let status = run_with_key("zfs", &args, &operation, key).await?;
         if !status.success() {
             return Err(io::Error::other(format!("{operation} failed with {status}")));
         }

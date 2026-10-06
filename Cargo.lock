@@ -2277,6 +2277,7 @@ dependencies = [
  "assert_cmd",
  "axum",
  "env_logger",
+ "getopts",
  "getoptsargs",
  "humantime",
  "log",
