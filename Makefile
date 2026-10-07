@@ -34,12 +34,13 @@ endif
 all:
 
 SUBST = sed \
+    -e 's|@BINDIR@|$(BINDIR)|g' \
     -e 's|@PREFIX@|$(PREFIX)|g' \
     -e 's|@SYSCONFDIR@|$(SYSCONFDIR)|g'
 
 include $(FLAVOR)/Makefile.inc
 
-CARGO = PREFIX="$(PREFIX)" SYSCONFDIR="$(SYSCONFDIR)" cargo
+CARGO = BINDIR="$(BINDIR)" PREFIX="$(PREFIX)" SYSCONFDIR="$(SYSCONFDIR)" cargo
 MANPAGES := target/zkeys.8 man/zkeys.toml.5
 SRCS := Cargo.toml Cargo.lock rust-toolchain.toml \
     $(shell find "src" "tests" \( -name "*.rs" -o -name "Cargo.*" \) -and -not -path "./target/*")
@@ -49,7 +50,7 @@ all: release manpages
 .PHONY: target/stamp.paths.new
 target/stamp.paths.new:
 	@mkdir -p "$(dir $@)"
-	@printf '%s\n%s\n' '$(PREFIX)' '$(SYSCONFDIR)' >"$@"
+	@printf '%s\n%s\n%s\n' '$(BINDIR)' '$(PREFIX)' '$(SYSCONFDIR)' >"$@"
 
 target/stamp.paths: target/stamp.paths.new
 	@mkdir -p "$(dir $@)"
@@ -77,7 +78,8 @@ target/zkeys.8: man/zkeys.8.in target/stamp.paths
 
 .PHONY: install
 install: all
-	env DESTDIR="$(DESTDIR)" \
+	env BINDIR="$(BINDIR)" \
+	    DESTDIR="$(DESTDIR)" \
 	    PREFIX="$(PREFIX)" \
 	    SYSCONFDIR="$(SYSCONFDIR)" \
 	    ./install.sh

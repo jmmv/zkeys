@@ -37,7 +37,7 @@ command="daemon"
 rcvar="zkeys_keep_alive_enable"
 pidfile="/var/run/zkeys-keep-alive.pid"
 start_cmd="zkeys_keep_alive_start"
-required_files="@SYSCONFDIR@/zkeys.toml @PREFIX@/sbin/zkeys"
+required_files="@SYSCONFDIR@/zkeys.toml @BINDIR@/zkeys"
 
 zkeys_keep_alive_start()
 {
@@ -53,7 +53,7 @@ zkeys_keep_alive_start()
         -o /var/log/zkeys-keep-alive.log \
         -H \
         -t "zkeys-keep-alive" \
-        @PREFIX@/sbin/zkeys \
+        @BINDIR@/zkeys \
         keep-alive \
         --config-file @SYSCONFDIR@/zkeys.toml
 }

@@ -27,6 +27,7 @@
 
 set -eu
 
+BINDIR="${DESTDIR:-}${BINDIR?}"
 PREFIX="${DESTDIR:-}${PREFIX?}"
 SYSCONFDIR="${DESTDIR:-}${SYSCONFDIR?}"
 
@@ -35,8 +36,8 @@ install() {
     command install "${@}"
 }
 
-install -m 755 -d "${PREFIX}/sbin"
-install -m 755 target/release/zkeys "${PREFIX}/sbin/zkeys"
+install -m 755 -d "${BINDIR}"
+install -m 755 target/release/zkeys "${BINDIR}/zkeys"
 
 install -m 755 -d "${SYSCONFDIR}"
 install -m 600 zkeys.toml.tmpl "${SYSCONFDIR}/zkeys.toml.tmpl"
