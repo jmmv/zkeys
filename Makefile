@@ -25,47 +25,52 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 PREFIX ?= /usr/local
+SYSCONFDIR ?= ${PREFIX}/etc
 
-CARGO = PREFIX="$(PREFIX)" cargo
+CARGO = PREFIX="$(PREFIX)" SYSCONFDIR="$(SYSCONFDIR)" cargo
 MANPAGES := target/zkeys.8 man/zkeys.toml.5
 SRCS := Cargo.toml Cargo.lock rust-toolchain.toml \
     $(shell find "src" "tests" \( -name "*.rs" -o -name "Cargo.*" \) -and -not -path "./target/*")
 
-.PHONY: all
 all: release manpages
 
-.PHONY: target/stamp.prefix.new
-target/stamp.prefix.new:
+.PHONY: target/stamp.paths.new
+target/stamp.paths.new:
 	@mkdir -p "$(dir $@)"
-	@printf '%s\n' '$(PREFIX)' >"$@"
+	@printf '%s\n%s\n' '$(PREFIX)' '$(SYSCONFDIR)' >"$@"
 
-target/stamp.prefix: target/stamp.prefix.new
+target/stamp.paths: target/stamp.paths.new
 	@mkdir -p "$(dir $@)"
 	@cmp -s "$<" "$@" || cp "$<" "$@"
 
 .PHONY: debug
 debug: target/debug/zkeys
 
-target/debug/zkeys: $(SRCS) target/stamp.prefix
+target/debug/zkeys: $(SRCS) target/stamp.paths
 	$(CARGO) build
 	@touch "$@"
 
 .PHONY: release
 release: target/release/zkeys
 
-target/release/zkeys: $(SRCS) target/stamp.prefix
+target/release/zkeys: $(SRCS) target/stamp.paths
 	$(CARGO) build --release
 	@touch "$@"
 
 manpages: $(MANPAGES)
 
-target/zkeys.8: man/zkeys.8.in target/stamp.prefix
+target/zkeys.8: man/zkeys.8.in target/stamp.paths
 	@mkdir -p "$(dir $@)"
-	sed -e 's|@PREFIX@|$(PREFIX)|g' "$<" >"$@"
+	sed -e 's|@PREFIX@|$(PREFIX)|g' \
+	    -e 's|@SYSCONFDIR|$(SYSCONFDIR)|g' \
+	    "$<" >"$@"
 
 .PHONY: install
 install: all
-	sh "./install.sh" "$(PREFIX)"
+	env DESTDIR="$(DESTDIR)" \
+	    PREFIX="$(PREFIX)" \
+	    SYSCONFDIR="$(SYSCONFDIR)" \
+	    ./install.sh
 
 .PHONY: test
 test:

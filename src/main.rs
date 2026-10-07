@@ -42,10 +42,15 @@ struct Paths {
 impl Default for Paths {
     /// Instantiates a set of default paths.
     fn default() -> Self {
-        let prefix = env::var("ZKEYS_TEST_PREFIX").map(PathBuf::from).unwrap_or(
-            option_env!("PREFIX").map(PathBuf::from).unwrap_or(PathBuf::from("/usr/local")),
-        );
-        Self { config_file: prefix.join("etc/zkeys.toml") }
+        let sysconfdir = match env::var("ZKEYS_TEST_PREFIX") {
+            Ok(prefix) => PathBuf::from(prefix).join("etc"),
+
+            Err(_) => option_env!("SYSCONFDIR")
+                .map(PathBuf::from)
+                .unwrap_or(PathBuf::from("/usr/local/etc")),
+        };
+
+        Self { config_file: sysconfdir.join("zkeys.toml") }
     }
 }
 

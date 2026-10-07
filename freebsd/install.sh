@@ -27,7 +27,8 @@
 
 set -eu
 
-PREFIX="${DESTDIR:-}${1:-/usr/local}"
+PREFIX="${DESTDIR:-}${PREFIX?}"
+SYSCONFDIR="${DESTDIR:-}${SYSCONFDIR?}"
 
 install() {
     echo "install ${*}" 1>&2
@@ -36,13 +37,15 @@ install() {
 
 install -m 755 -d "${PREFIX}/sbin"
 install -m 755 target/release/zkeys "${PREFIX}/sbin/zkeys"
-install -m 755 -d "${PREFIX}/etc"
-install -m 600 zkeys.toml.tmpl "${PREFIX}/etc/zkeys.toml.tmpl"
-install -m 755 -d "${PREFIX}/etc/newsyslog.conf.d"
-install -m 644 freebsd/newsyslog.conf "${PREFIX}/etc/newsyslog.conf.d/zkeys.conf"
-install -m 755 -d "${PREFIX}/etc/rc.d"
-install -m 755 freebsd/keep-alive.rc.d.sh "${PREFIX}/etc/rc.d/zkeys-keep-alive"
-install -m 755 freebsd/mount-all.rc.d.sh "${PREFIX}/etc/rc.d/zkeys-mount-all"
+
+install -m 755 -d "${SYSCONFDIR}"
+install -m 600 zkeys.toml.tmpl "${SYSCONFDIR}/zkeys.toml.tmpl"
+install -m 755 -d "${SYSCONFDIR}/newsyslog.conf.d"
+install -m 644 freebsd/newsyslog.conf "${SYSCONFDIR}/newsyslog.conf.d/zkeys.conf"
+install -m 755 -d "${SYSCONFDIR}/rc.d"
+install -m 755 freebsd/keep-alive.rc.d.sh "${SYSCONFDIR}/rc.d/zkeys-keep-alive"
+install -m 755 freebsd/mount-all.rc.d.sh "${SYSCONFDIR}/rc.d/zkeys-mount-all"
+
 install -m 755 -d "${PREFIX}/share/man/man5"
 install -m 644 man/zkeys.toml.5 "${PREFIX}/share/man/man5/zkeys.toml.5"
 install -m 755 -d "${PREFIX}/share/man/man8"

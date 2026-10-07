@@ -102,7 +102,7 @@ The following option is supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .El
 .Ss The list-keys command
 The list-keys command prints the names of all keys in the configuration file.
@@ -115,7 +115,7 @@ The following option is supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .El
 .Ss The luks-stage-keys command
 The luks-stage-keys command retrieves the keys associated with all configured
@@ -138,7 +138,7 @@ The following options are supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .It Fl -output-dir Ar directory
 Directory in which to stage the keys.
 .Pp
@@ -170,7 +170,7 @@ The following options are supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .El
 .Ss The zfs-change-key command
 The zfs-change-key command retrieves the key associated with the ZFS dataset
@@ -209,7 +209,7 @@ The following options are supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .It Fl -quiet
 Do not print the full key after
 .Xr zfs 8
@@ -254,7 +254,7 @@ The following options are supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .It Fl -quiet
 Do not print the full key after
 .Xr zfs 8
@@ -304,7 +304,7 @@ The following options are supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .It Fl -quiet
 Do not print the full key after
 .Xr zpool 8
@@ -337,7 +337,7 @@ datasets are configured.
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .El
 .Ss The zfs-list command
 The zfs-list command prints the ZFS datasets in the configuration file and the
@@ -351,7 +351,7 @@ The following option is supported:
 Path to the configuration file.
 .Pp
 Default:
-.Pa @PREFIX@/etc/zkeys.toml
+.Pa @SYSCONFDIR@/zkeys.toml
 .El
 .Ss The help command
 The help command prints command-line usage information.
@@ -364,7 +364,7 @@ output.
 This command always exits successfully.
 .Sh FILES
 .Bl -tag -width XXXX
-.It Pa @PREFIX@/etc/zkeys.toml
+.It Pa @SYSCONFDIR@/zkeys.toml
 Default configuration file.
 See
 .Xr zkeys.toml 5

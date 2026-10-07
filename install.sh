@@ -27,8 +27,6 @@
 
 set -eu
 
-readonly PREFIX="${1:?Must specify a PREFIX}"
-
 flavor="${ZKEYS_TEST_INSTALL_FLAVOR:-}"
 if [ -z "${flavor}" ]; then
     case "$(uname -s)" in
@@ -43,4 +41,4 @@ if [ -z "${flavor}" ]; then
     esac
 fi
 
-exec "./${flavor}/install.sh" "${PREFIX}"
+exec "./${flavor}/install.sh"
