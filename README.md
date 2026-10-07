@@ -36,9 +36,9 @@ This installs to `/usr/local` by default.  To use another prefix, pass it to
 $ make install PREFIX=/opt/local
 ```
 
-Note that `make install` does different things depending on the host OS because
-it sets up all the integration points for automatic key unlocking at boot time
-and installs periodic key keep-alives throughout the system's uptime.
+Note that `make install` installs different payloads depending on the host OS,
+following common conventions on each platform.  This does _not_ configure the
+host to enable any zkeys services, however.
 
 ## Documentation
 
