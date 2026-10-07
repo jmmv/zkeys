@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/sbin
 SYSCONFDIR ?= $(PREFIX)/etc
 
 all: target/freebsd/keep-alive.rc.d.sh
