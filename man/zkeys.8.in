@@ -42,6 +42,10 @@
 .Cm list-keys
 .Op Fl -config-file Ar file
 .Nm
+.Cm luks-stage-keys
+.Op Fl -config-file Ar file
+.Op Fl -output-dir Ar directory
+.Nm
 .Cm zfs-change-key
 .Op Fl -config-file Ar file
 .Op Fl -quiet
@@ -74,8 +78,8 @@
 .Sh DESCRIPTION
 .Nm
 retrieves secrets from a zkeys service and is designed for integration with
-ZFS deployments to securely unlock pools or file systems without keeping the
-key stored on the same machine.
+encrypted storage to securely unlock volumes, pools, or file systems without
+keeping the full key stored on the same machine.
 .Pp
 Note that, by design, this client does
 .Em not
@@ -112,6 +116,34 @@ Path to the configuration file.
 .Pp
 Default:
 .Pa @PREFIX@/etc/zkeys.toml
+.El
+.Ss The luks-stage-keys command
+The luks-stage-keys command retrieves the keys associated with all configured
+LUKS volumes and then atomically writes each key to a file named
+.Pa <volume>.key .
+This is designed to operate in conjunction with
+.Xr dracut 8
+to stage keys for unattended unlocking of boot volumes.
+.Pp
+The command tries to make as much progress as possible if a key cannot be
+staged, but reports an error if any key fails or if no LUKS volumes are
+configured.
+.Pp
+The files and any newly-created destination directories are only accessible by
+the user running the command.
+.Pp
+The following options are supported:
+.Bl -tag -width XXXX
+.It Fl -config-file Ar file
+Path to the configuration file.
+.Pp
+Default:
+.Pa @PREFIX@/etc/zkeys.toml
+.It Fl -output-dir Ar directory
+Directory in which to stage the keys.
+.Pp
+Default:
+.Pa /run/cryptsetup-keys.d
 .El
 .Ss The keep-alive command
 The keep-alive command periodically updates the last-access time of keys so

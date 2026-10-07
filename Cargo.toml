@@ -37,10 +37,10 @@ reqwest = { version = "0.13", features = ["query"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["full", "rt-multi-thread"] }
 toml = "0.9"
+tempfile = "3"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1.16", default-features = false, features = ["serde", "std"] }
 
 [dev-dependencies]
 assert_cmd = "2"
 axum = "0.8"
-tempfile = "3"

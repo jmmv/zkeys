@@ -134,6 +134,7 @@ mod tests {
             default_key_refresh_period: Duration::from_secs(300),
             keys,
             service_url: Url::parse("http://unused.example/").unwrap(),
+            luks: HashMap::default(),
             zfs,
         }
     }

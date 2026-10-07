@@ -42,6 +42,7 @@ Commands:
     help                show command-line usage information
     keep-alive          periodically keep keys alive
     list-keys           list configured keys
+    luks-stage-keys     retrieve and stage configured LUKS keys
     version             show version information
     zfs-change-key      change a ZFS encryption key
     zfs-create          create an encrypted ZFS dataset

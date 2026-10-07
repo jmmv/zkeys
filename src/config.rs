@@ -31,7 +31,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Component, Path};
 use std::time::Duration;
 use url::Url;
 use uuid::Uuid;
@@ -66,6 +66,14 @@ pub struct Key {
     pub local_secret: String,
 }
 
+/// Describes the key associated with a LUKS volume.
+#[derive(Clone, Deserialize)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+pub struct LuksVolume {
+    /// Name of the key used to unlock the volume.
+    pub key: String,
+}
+
 /// Describes the key associated with a ZFS dataset.
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
@@ -90,6 +98,10 @@ pub struct Config {
     #[serde(default)]
     pub keys: HashMap<String, Key>,
 
+    /// LUKS volumes indexed by their mapper names.
+    #[serde(default)]
+    pub luks: HashMap<String, LuksVolume>,
+
     /// ZFS datasets indexed by their names.
     #[serde(default)]
     pub zfs: HashMap<String, ZfsDataset>,
@@ -100,6 +112,27 @@ impl Config {
     fn parse_from_str(content: &str) -> io::Result<Self> {
         let config: Self = toml::from_str(content)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+
+        for (volume, luks) in &config.luks {
+            // LUKS mapper names are supposed to be unique path components.  Make sure they are
+            // so that we don't end up trying to create subdirectories and the like later on.
+            let mut components = Path::new(volume).components();
+            if !matches!(components.next(), Some(Component::Normal(_)))
+                || components.next().is_some()
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid LUKS volume name {volume:?}"),
+                ));
+            }
+
+            if !config.keys.contains_key(&luks.key) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("LUKS volume {volume} references undefined key {}", luks.key),
+                ));
+            }
+        }
 
         for (dataset, zfs) in &config.zfs {
             if !config.keys.contains_key(&zfs.key) {
@@ -152,6 +185,7 @@ mod tests {
                 service_url: Url::parse("https://zkeys.jmmv.dev/").unwrap(),
                 keys: HashMap::default(),
                 default_key_refresh_period: default_key_refresh_period(),
+                luks: HashMap::default(),
                 zfs: HashMap::default(),
             },
             config
@@ -181,6 +215,9 @@ mod tests {
             },
         );
 
+        let mut luks = HashMap::default();
+        luks.insert("root".to_owned(), LuksVolume { key: "first".to_owned() });
+
         let mut zfs = HashMap::default();
         zfs.insert("pool/first".to_owned(), ZfsDataset { key: "first".to_owned() });
         zfs.insert("second".to_owned(), ZfsDataset { key: "second".to_owned() });
@@ -200,6 +237,9 @@ id = "{KEY_ID_2}"
 remote_password = "remote-password-2"
 local_secret = "local-secret-2"
 
+[luks.root]
+key = "first"
+
 [zfs."pool/first"]
 key = "first"
 
@@ -214,10 +254,46 @@ key = "second"
                 service_url: Url::parse("https://example.com/api/").unwrap(),
                 default_key_refresh_period: Duration::from_secs(2 * 24 * 60 * 60),
                 keys,
+                luks,
                 zfs,
             },
             config
         );
+    }
+
+    #[test]
+    fn test_parse_from_str_rejects_invalid_luks_volume_name() {
+        for volume in ["", ".", "..", "dir/name", "/name"] {
+            let error = Config::parse_from_str(&format!(
+                r#"
+[keys.test]
+id = "00000001-0001-0001-0001-000000000001"
+remote_password = "password"
+local_secret = "secret"
+
+[luks.{volume:?}]
+key = "test"
+"#
+            ))
+            .unwrap_err();
+
+            assert_eq!(io::ErrorKind::InvalidData, error.kind());
+            assert_eq!(format!("Invalid LUKS volume name {volume:?}"), error.to_string());
+        }
+    }
+
+    #[test]
+    fn test_parse_from_str_rejects_undefined_luks_key() {
+        let error = Config::parse_from_str(
+            r#"
+[luks.root]
+key = "missing"
+"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(io::ErrorKind::InvalidData, error.kind());
+        assert_eq!("LUKS volume root references undefined key missing", error.to_string());
     }
 
     #[test]

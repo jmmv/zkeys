@@ -32,6 +32,8 @@ mod get_key;
 pub use get_key::get_key;
 mod keep_alive;
 pub use keep_alive::keep_alive;
+mod luks_stage_keys;
+pub use luks_stage_keys::luks_stage_keys;
 mod service;
 pub(crate) mod zfs;
 mod zfs_change_key;

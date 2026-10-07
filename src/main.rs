@@ -141,6 +141,28 @@ async fn keep_alive_main(_app_matches: Matches, command_matches: Matches) -> Res
     Ok(0)
 }
 
+/// Adds the options for the `luks-stage-keys` command.
+fn luks_stage_keys_setup(builder: CommandBuilder) -> CommandBuilder {
+    config_setup(builder.optopt(
+        "",
+        "output-dir",
+        "directory in which to stage LUKS keys (default: /run/cryptsetup-keys.d)",
+        "DIR",
+    ))
+}
+
+/// Runs the `luks-stage-keys` command.
+async fn luks_stage_keys_main(_app_matches: Matches, command_matches: Matches) -> Result<i32> {
+    init_env_logger(env!("CARGO_BIN_NAME"));
+    let config = load_config(&command_matches)?;
+    let output_dir = command_matches
+        .opt_str("output-dir")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/run/cryptsetup-keys.d"));
+    luks_stage_keys(config, &output_dir).await?;
+    Ok(0)
+}
+
 /// Adds the options and arguments for the `zfs-load-key` command.
 fn zfs_load_key_setup(builder: CommandBuilder) -> CommandBuilder {
     config_setup(builder.optflag("a", "all", "load keys for all configured ZFS datasets")).trailarg(
@@ -233,6 +255,12 @@ fn app_setup(builder: Builder) -> Builder {
         .cmd_async("get-key", "retrieve a key", get_key_setup, get_key_main)
         .cmd_async("list-keys", "list configured keys", list_keys_setup, list_keys_main)
         .cmd_async("keep-alive", "periodically keep keys alive", keep_alive_setup, keep_alive_main)
+        .cmd_async(
+            "luks-stage-keys",
+            "retrieve and stage configured LUKS keys",
+            luks_stage_keys_setup,
+            luks_stage_keys_main,
+        )
         .cmd_async(
             "zfs-change-key",
             "change a ZFS encryption key",
