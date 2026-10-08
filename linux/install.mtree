@@ -25,6 +25,22 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 . type=dir
+    lib type=dir mode=0755
+        dracut type=dir mode=0755
+            modules.d type=dir mode=0755
+                50zkeys type=dir mode=0755
+                    module-setup.sh type=file mode=0755
+                    zkeys-cryptsetup.conf type=file mode=0644
+                    zkeys-initrd.service type=file mode=0644
+                ..
+            ..
+        ..
+    ..
+    libexec type=dir mode=0755
+        zkeys type=dir mode=0755
+            setup.sh type=file mode=0755
+        ..
+    ..
     sbin type=dir mode=0755
         zkeys type=file mode=0755
     ..
@@ -33,6 +49,7 @@
             zkeys type=dir mode=0755
                 LICENSE type=file mode=0644
                 NOTICE type=file mode=0644
+                README.linux.md type=file mode=0644
                 README.md type=file mode=0644
             ..
         ..

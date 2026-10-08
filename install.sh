@@ -34,6 +34,10 @@ if [ -z "${flavor}" ]; then
         flavor=freebsd
         ;;
 
+    Linux)
+        flavor=linux
+        ;;
+
     *)
         echo "Cannot determine installer for this system" 1>&2
         exit 1

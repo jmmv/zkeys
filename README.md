@@ -15,8 +15,8 @@ the whole purpose of ZKeys.
 
 ZKeys is named after ZFS as this project originated with the desire to automate
 unattended boots of FreeBSD machines in a secure fashion.  However, there is
-not much here that's ZFS-specific, so presumably this could be adapted to other
-unattended boot scenarios.
+not much here that's ZFS-specific and, in fact, zkeys supports Linux systems
+with dracut as well (such as Fedora) for unattended boot scenarios.
 
 Visit <https://zkeys.jmmv.dev/> for more details on the product.
 
@@ -48,3 +48,4 @@ manual pages for detailed usage and configuration information.
 For quick, platform-specific setup notes, see:
 
 *   [freebsd/README.md](freebsd/README.md)
+*   [linux/README.md](linux/README.md)
