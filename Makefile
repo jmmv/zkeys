@@ -33,6 +33,9 @@ endif
 .PHONY: all
 all:
 
+.PHONY: test
+test:
+
 SUBST = sed \
     -e 's|@BINDIR@|$(BINDIR)|g' \
     -e 's|@PREFIX@|$(PREFIX)|g' \
@@ -84,8 +87,9 @@ install: all
 	    SYSCONFDIR="$(SYSCONFDIR)" \
 	    ./install.sh
 
-.PHONY: test
-test:
+test: test-cargo
+.PHONY: test-cargo
+test-cargo:
 	$(CARGO) test
 
 .PHONY: lint

@@ -47,3 +47,7 @@ all: $(KEEP_ALIVE_SERVICE)
 $(KEEP_ALIVE_SERVICE): linux/systemd/zkeys-keep-alive.service.in target/stamp.paths
 	@mkdir -p "$(dir $@)"
 	$(SUBST) "$<" >"$@"
+
+test: test-dracut
+test-dracut: target/linux/dracut/50zkeys/module-setup.sh
+	./linux/dracut_test.sh

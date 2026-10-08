@@ -32,6 +32,49 @@ check() {
     return 0
 }
 
+# called by dracut
+install_network_timeout() {
+    local unit
+
+    for unit in NetworkManager-wait-online-initrd.service nm-wait-online-initrd.service; do
+        inst_dir "$systemdsystemunitdir/$unit.d"
+        inst_simple "$moddir/zkeys-network-online.conf" \
+            "$systemdsystemunitdir/$unit.d/zkeys.conf"
+    done
+}
+
+install_wifi() {
+    local metadata profile
+
+    profile="$dracutsysrootdir/etc/NetworkManager/system-connections/zkeys-initrd.nmconnection"
+    [[ -e $profile || -L $profile ]] || return 0
+
+    if [[ -L $profile || ! -f $profile ]]; then
+        dfatal "ZKeys Wi-Fi profile must be a regular file: $profile"
+        return 1
+    fi
+
+    metadata=$(stat -Lc '%u:%a' -- "$profile") || return 1
+    if [[ $metadata != 0:600 ]]; then
+        dfatal "ZKeys Wi-Fi profile must be owned by root with mode 0600: $profile"
+        return 1
+    fi
+
+    if ! require_binaries wpa_supplicant; then
+        dfatal "ZKeys Wi-Fi profile requires wpa_supplicant"
+        return 1
+    fi
+
+    inst_binary wpa_supplicant
+    inst_multiple -o \
+        /etc/dbus-1/system.d/wpa_supplicant.conf \
+        /usr/share/dbus-1/system.d/wpa_supplicant.conf \
+        /usr/share/dbus-1/system-services/fi.w1.wpa_supplicant1.service \
+        "$systemdsystemunitdir/wpa_supplicant.service"
+    inst_simple "$profile" \
+        /etc/NetworkManager/system-connections/zkeys-initrd.nmconnection
+}
+
 depends() {
     echo "crypt network-manager systemd"
 }
@@ -50,4 +93,7 @@ install() {
     inst_dir "$systemdsystemunitdir/systemd-cryptsetup@.service.d"
     inst_simple "$moddir/zkeys-cryptsetup.conf" \
         "$systemdsystemunitdir/systemd-cryptsetup@.service.d/zkeys.conf"
+
+    install_network_timeout
+    install_wifi
 }
