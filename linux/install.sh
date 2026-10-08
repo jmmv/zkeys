@@ -51,3 +51,19 @@ install -m 755 -d "${PREFIX}/share/doc/zkeys"
 install -m 644 LICENSE "${PREFIX}/share/doc/zkeys/LICENSE"
 install -m 644 NOTICE "${PREFIX}/share/doc/zkeys/NOTICE"
 install -m 644 README.md "${PREFIX}/share/doc/zkeys/README.md"
+install -m 644 linux/README.md "${PREFIX}/share/doc/zkeys/README.linux.md"
+
+# dracut does NOT recognize files under PREFIX unless PREFIX=/usr.
+# That's OK: we handle that in our post-install setup.sh script because
+# we want to keep installation here completely PREFIX-clean.
+DRACUT_MODULEDIR="${PREFIX}/lib/dracut/modules.d"
+install -m 755 -d "${DRACUT_MODULEDIR}/50zkeys"
+install -m 755 target/linux/dracut/50zkeys/module-setup.sh \
+    "${DRACUT_MODULEDIR}/50zkeys/module-setup.sh"
+install -m 644 linux/dracut/50zkeys/zkeys-cryptsetup.conf \
+    "${DRACUT_MODULEDIR}/50zkeys/zkeys-cryptsetup.conf"
+install -m 644 linux/dracut/50zkeys/zkeys-initrd.service \
+    "${DRACUT_MODULEDIR}/50zkeys/zkeys-initrd.service"
+
+install -m 755 -d "${PREFIX}/libexec/zkeys"
+install -m 755 target/linux/setup.sh "${PREFIX}/libexec/zkeys/setup.sh"

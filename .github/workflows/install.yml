@@ -63,3 +63,12 @@ jobs:
                   make
                   make install DESTDIR="${DESTDIR}"
                   mtree -f linux/install.mtree -p "${DESTDIR}"
+            - name: Post-install setup
+              env:
+                  DESTDIR: ${{ runner.temp }}/zkeys-destdir
+              run: |
+                  test ! -e "${DESTDIR}/etc/zkeys.toml"
+                  test ! -e "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys"
+                  "${DESTDIR}/usr/local/libexec/zkeys/setup.sh"
+                  test -f "${DESTDIR}/etc/zkeys.toml"
+                  test "$(readlink "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys")" = "/usr/local/lib/dracut/modules.d/50zkeys"

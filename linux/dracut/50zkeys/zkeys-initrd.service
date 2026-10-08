@@ -24,20 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/sbin
-SYSCONFDIR ?= /etc
+[Unit]
+Description=Stage ZKeys LUKS keys
+DefaultDependencies=no
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/zkeys.toml
 
-DRACUT_MODULE := target/linux/dracut/50zkeys/module-setup.sh
-all: $(DRACUT_MODULE)
-$(DRACUT_MODULE): linux/dracut/50zkeys/module-setup.sh.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
-	chmod 755 "$@"
-
-SETUP := target/linux/setup.sh
-all: $(SETUP)
-$(SETUP): linux/setup.sh target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
-	chmod 755 "$@"
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/zkeys luks-stage-keys --config-file /etc/zkeys.toml
+TimeoutStartSec=30s
