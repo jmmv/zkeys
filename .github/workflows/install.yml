@@ -72,3 +72,7 @@ jobs:
                   "${DESTDIR}/usr/local/libexec/zkeys/setup.sh"
                   test -f "${DESTDIR}/etc/zkeys.toml"
                   test "$(readlink "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys")" = "/usr/local/lib/dracut/modules.d/50zkeys"
+            - name: Verify systemd unit
+              env:
+                  DESTDIR: ${{ runner.temp }}/zkeys-destdir
+              run: systemd-analyze verify --man=no --recursive-errors=no --root="${DESTDIR}" /usr/local/lib/systemd/system/zkeys-keep-alive.service

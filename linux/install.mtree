@@ -35,6 +35,11 @@
                 ..
             ..
         ..
+        systemd type=dir mode=0755
+            system type=dir mode=0755
+                zkeys-keep-alive.service type=file mode=0644
+            ..
+        ..
     ..
     libexec type=dir mode=0755
         zkeys type=dir mode=0755

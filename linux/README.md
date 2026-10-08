@@ -22,12 +22,22 @@ $ sudo /usr/local/libexec/zkeys/setup.sh
 ```
 
 This creates `/etc/zkeys.toml` from the installed example if the file does not
-already exist and links the prefix-owned dracut module into
-`/usr/lib/dracut/modules.d`.  Think of this as a post-`make install` step to
+already exist, links the prefix-owned dracut module into
+`/usr/lib/dracut/modules.d`, and enables the systemd `keep-alive` systemd
+service without starting it.  Think of this as a post-`make install` step to
 activate files that don't belong in `PREFIX` because dracut only recognizes
 files in the system-managed `/usr/lib/dracut/` directory.
 
 Once that is done, follow these steps:
+
+1.   Start the keep-alive service to ensure keys remain unlocked from now on:
+
+    ```sh
+    $ sudo systemctl start zkeys-keep-alive.service
+    ```
+
+    Use `journalctl -u zkeys-keep-alive.service` to verify that the service
+    succeeds at sending the keep-alive messages.
 
 1.  Find the LUKS mapper name in the first field of its existing
     `/etc/crypttab` entry and associate that name with the ZKeys key for it

@@ -34,6 +34,7 @@ readonly SYSCONFDIR="@SYSCONFDIR@"
 readonly ROOT="${DESTDIR:-}"
 readonly DRACUT_MODULE="${PREFIX}/lib/dracut/modules.d/50zkeys"
 readonly DRACUT_LINK="/usr/lib/dracut/modules.d/50zkeys"
+readonly SYSTEMD_UNIT="${PREFIX}/lib/systemd/system/zkeys-keep-alive.service"
 
 err() {
     echo "${PROGNAME}: E: ${*}" 1>&2
@@ -74,6 +75,18 @@ setup_dracut() {
     log ln -s "${DRACUT_MODULE}" "${ROOT}${DRACUT_LINK}"
 }
 
+setup_systemd() {
+    [ -f "${ROOT}${SYSTEMD_UNIT}" ] \
+        || err "Cannot find the ZKeys systemd unit at ${SYSTEMD_UNIT}"
+
+    if [ -n "${ROOT}" ]; then
+        systemctl --root="${ROOT}" enable "${SYSTEMD_UNIT}"
+    else
+        systemctl enable "${SYSTEMD_UNIT}"
+        systemctl daemon-reload
+    fi
+}
+
 main() {
     if [ -z "${ROOT}" ] && [ "$(id -u)" -ne 0 ]; then
         err "Must run as root"
@@ -81,6 +94,7 @@ main() {
 
     setup_config
     setup_dracut
+    setup_systemd
 }
 
 main "${@}"
