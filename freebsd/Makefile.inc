@@ -26,3 +26,13 @@
 
 PREFIX ?= /usr/local
 SYSCONFDIR ?= $(PREFIX)/etc
+
+all: target/freebsd/keep-alive.rc.d.sh
+target/freebsd/keep-alive.rc.d.sh: freebsd/keep-alive.rc.d.sh target/stamp.paths
+	@mkdir -p "$(dir $@)"
+	$(SUBST) "$<" >"$@"
+
+all: target/freebsd/mount-all.rc.d.sh
+target/freebsd/mount-all.rc.d.sh: freebsd/mount-all.rc.d.sh target/stamp.paths
+	@mkdir -p "$(dir $@)"
+	$(SUBST) "$<" >"$@"
