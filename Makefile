@@ -33,6 +33,10 @@ endif
 .PHONY: all
 all:
 
+SUBST = sed \
+    -e 's|@PREFIX@|$(PREFIX)|g' \
+    -e 's|@SYSCONFDIR@|$(SYSCONFDIR)|g'
+
 include $(FLAVOR)/Makefile.inc
 
 CARGO = PREFIX="$(PREFIX)" SYSCONFDIR="$(SYSCONFDIR)" cargo
@@ -69,9 +73,7 @@ manpages: $(MANPAGES)
 
 target/zkeys.8: man/zkeys.8.in target/stamp.paths
 	@mkdir -p "$(dir $@)"
-	sed -e 's|@PREFIX@|$(PREFIX)|g' \
-	    -e 's|@SYSCONFDIR|$(SYSCONFDIR)|g' \
-	    "$<" >"$@"
+	$(SUBST) "$<" >"$@"
 
 .PHONY: install
 install: all

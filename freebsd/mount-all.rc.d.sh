@@ -35,13 +35,13 @@ name="zkeys_mount_all"
 desc="The ZKeys ZFS mounting service"
 rcvar="zkeys_mount_all_enable"
 start_cmd="zkeys_mount_all_start"
-required_files="/usr/local/etc/zkeys.toml /usr/local/sbin/zkeys"
+required_files="@SYSCONFDIR@/zkeys.toml @PREFIX@/sbin/zkeys"
 required_modules="zfs"
 
 zkeys_mount_all_start()
 {
     echo "Running ${name}."
-    /usr/local/sbin/zkeys zfs-load-key -a &&
+    @PREFIX@/sbin/zkeys zfs-load-key -a &&
         zfs mount -a &&
         zfs share -a
 }
