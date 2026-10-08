@@ -67,3 +67,7 @@ install -m 644 linux/dracut/50zkeys/zkeys-initrd.service \
 
 install -m 755 -d "${PREFIX}/libexec/zkeys"
 install -m 755 target/linux/setup.sh "${PREFIX}/libexec/zkeys/setup.sh"
+
+SYSTEMD_UNITDIR="${PREFIX}/lib/systemd/system"
+install -m 755 -d "${SYSTEMD_UNITDIR}"
+install -m 644 target/zkeys-keep-alive.service "${SYSTEMD_UNITDIR}/zkeys-keep-alive.service"

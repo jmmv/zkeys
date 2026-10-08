@@ -24,26 +24,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/sbin
-SYSCONFDIR ?= /etc
+[Unit]
+Description=Keep ZKeys keys alive
+Documentation=man:zkeys(8)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=5min
+StartLimitBurst=5
 
-DRACUT_MODULE := target/linux/dracut/50zkeys/module-setup.sh
-all: $(DRACUT_MODULE)
-$(DRACUT_MODULE): linux/dracut/50zkeys/module-setup.sh.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
-	chmod 755 "$@"
+[Service]
+Type=exec
+ExecStart=@BINDIR@/zkeys keep-alive --config-file @CONFIG_FILE@
+Restart=on-failure
+RestartSec=30s
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
-SETUP := target/linux/setup.sh
-all: $(SETUP)
-$(SETUP): linux/setup.sh target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
-	chmod 755 "$@"
-
-KEEP_ALIVE_SERVICE := target/zkeys-keep-alive.service
-all: $(KEEP_ALIVE_SERVICE)
-$(KEEP_ALIVE_SERVICE): linux/systemd/zkeys-keep-alive.service.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
+[Install]
+WantedBy=multi-user.target
