@@ -29,11 +29,11 @@ BINDIR ?= $(PREFIX)/sbin
 SYSCONFDIR ?= $(PREFIX)/etc
 
 all: target/freebsd/keep-alive.rc.d.sh
-target/freebsd/keep-alive.rc.d.sh: freebsd/keep-alive.rc.d.sh target/stamp.paths
+target/freebsd/keep-alive.rc.d.sh: freebsd/keep-alive.rc.d.sh.in target/stamp.paths
 	@mkdir -p "$(dir $@)"
 	$(SUBST) "$<" >"$@"
 
 all: target/freebsd/mount-all.rc.d.sh
-target/freebsd/mount-all.rc.d.sh: freebsd/mount-all.rc.d.sh target/stamp.paths
+target/freebsd/mount-all.rc.d.sh: freebsd/mount-all.rc.d.sh.in target/stamp.paths
 	@mkdir -p "$(dir $@)"
 	$(SUBST) "$<" >"$@"
