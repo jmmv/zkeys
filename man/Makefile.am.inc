@@ -24,26 +24,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/sbin
-SYSCONFDIR ?= /etc
+EXTRA_DIST += \
+	man/Makefile.am.inc \
+	man/zkeys.8.in
 
-DRACUT_MODULE := target/linux/dracut/50zkeys/module-setup.sh
-all: $(DRACUT_MODULE)
-$(DRACUT_MODULE): linux/dracut/50zkeys/module-setup.sh.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
-	chmod 755 "$@"
+man_built_sources = man/zkeys.8
+man/zkeys.8: $(srcdir)/man/zkeys.8.in Makefile
+	$(AM_V_GEN)$(MKDIR_P) "$(dir $@)"
+	$(AM_V_at)$(do_subst) "$<" >"$@"
 
-SETUP := target/linux/setup.sh
-all: $(SETUP)
-$(SETUP): linux/setup.sh target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
-	chmod 755 "$@"
+BUILT_SOURCES += $(man_built_sources)
+CLEANFILES += $(man_built_sources)
 
-KEEP_ALIVE_SERVICE := target/zkeys-keep-alive.service
-all: $(KEEP_ALIVE_SERVICE)
-$(KEEP_ALIVE_SERVICE): linux/systemd/zkeys-keep-alive.service.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
+dist_man5_MANS = man/zkeys.toml.5
+nodist_man8_MANS = man/zkeys.8

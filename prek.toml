@@ -77,11 +77,20 @@ files = "^Cargo\\.(toml|lock)$"
 pass_filenames = false
 
 [[repos.hooks]]
+id = "rust-sources"
+name = "Check Rust source list"
+language = "system"
+entry = "admin/check-rust-sources.sh"
+files = "(^(src|tests)/.*\\.rs$|^src/Makefile\\.am\\.inc$|^admin/check-rust-sources\\.sh$)"
+pass_filenames = false
+always_run = true
+
+[[repos.hooks]]
 id = "shellcheck"
 name = "Check shell scripts"
 language = "system"
 entry = "shellcheck"
-files = "\\.sh$"
+files = "\\.sh(\\.in)?$"
 
 [[repos.hooks]]
 id = "do-not-submit"

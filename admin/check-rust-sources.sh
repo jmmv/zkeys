@@ -27,33 +27,40 @@
 
 set -eu
 
-BINDIR="${DESTDIR:-}${BINDIR?}"
-PREFIX="${DESTDIR:-}${PREFIX?}"
-SYSCONFDIR="${DESTDIR:-}${SYSCONFDIR?}"
+cd "$(dirname "$0")/.."
 
-install() {
-    echo "install ${*}" 1>&2
-    command install "${@}"
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/zkeys-rust-sources.XXXXXX")
+cleanup() {
+    rm -rf "${work_dir}"
+}
+trap cleanup EXIT HUP INT TERM QUIT
+
+# shellcheck disable=SC3043
+check_sources() {
+    local directory="${1}"; shift
+    local variable="${1}"; shift
+
+    find "${directory}" -type f -name '*.rs' -print \
+        | LC_ALL=C sort >"${work_dir}/actual"
+    awk -v variable="${variable}" '
+        $1 == variable && $2 == "=" {
+            in_sources = 1
+            next
+        }
+        in_sources {
+            line = $0
+            sub(/^[[:space:]]*/, "", line)
+            continued = sub(/[[:space:]]*\\$/, "", line)
+            print line
+            if (!continued) exit
+        }
+    ' src/Makefile.am.inc | LC_ALL=C sort >"${work_dir}/listed"
+
+    if ! diff -u "${work_dir}/actual" "${work_dir}/listed"; then
+        echo "ERROR: ${variable} in src/Makefile.am.inc is out of date" 1>&2
+        exit 1
+    fi
 }
 
-install -m 755 -d "${BINDIR}"
-install -m 755 target/release/zkeys "${BINDIR}/zkeys"
-
-install -m 755 -d "${SYSCONFDIR}"
-install -m 600 zkeys.toml.tmpl "${SYSCONFDIR}/zkeys.toml.tmpl"
-install -m 755 -d "${SYSCONFDIR}/newsyslog.conf.d"
-install -m 644 freebsd/newsyslog.conf "${SYSCONFDIR}/newsyslog.conf.d/zkeys.conf"
-install -m 755 -d "${SYSCONFDIR}/rc.d"
-install -m 755 target/freebsd/keep-alive.rc.d.sh "${SYSCONFDIR}/rc.d/zkeys-keep-alive"
-install -m 755 target/freebsd/mount-all.rc.d.sh "${SYSCONFDIR}/rc.d/zkeys-mount-all"
-
-install -m 755 -d "${PREFIX}/share/man/man5"
-install -m 644 man/zkeys.toml.5 "${PREFIX}/share/man/man5/zkeys.toml.5"
-install -m 755 -d "${PREFIX}/share/man/man8"
-install -m 644 target/zkeys.8 "${PREFIX}/share/man/man8/zkeys.8"
-
-install -m 755 -d "${PREFIX}/share/doc/zkeys"
-install -m 644 LICENSE "${PREFIX}/share/doc/zkeys/LICENSE"
-install -m 644 NOTICE "${PREFIX}/share/doc/zkeys/NOTICE"
-install -m 644 README.md "${PREFIX}/share/doc/zkeys/README.md"
-install -m 644 freebsd/README.md "${PREFIX}/share/doc/zkeys/README.freebsd.md"
+check_sources src rust_sources
+check_sources tests rust_test_sources
