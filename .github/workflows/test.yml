@@ -28,4 +28,6 @@ jobs:
         steps:
             - uses: actions/checkout@v6
             - uses: mozilla-actions/sccache-action@v0.0.9
-            - run: make test
+            - run: autoreconf -is
+            - run: mkdir build && cd build && ../configure
+            - run: make -C build check

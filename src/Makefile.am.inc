@@ -24,16 +24,39 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/sbin
-SYSCONFDIR ?= $(PREFIX)/etc
+EXTRA_DIST += \
+	src/Makefile.am.inc \
+	$(rust_sources) \
+	$(rust_test_sources)
 
-all: target/freebsd/keep-alive.rc.d.sh
-target/freebsd/keep-alive.rc.d.sh: freebsd/keep-alive.rc.d.sh.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
+rust_sources = \
+	src/config.rs \
+	src/get_key.rs \
+	src/keep_alive.rs \
+	src/lib.rs \
+	src/luks_stage_keys.rs \
+	src/main.rs \
+	src/service.rs \
+	src/zfs.rs \
+	src/zfs_change_key.rs \
+	src/zfs_create.rs \
+	src/zfs_load_key.rs \
+	src/zpool_create.rs
 
-all: target/freebsd/mount-all.rc.d.sh
-target/freebsd/mount-all.rc.d.sh: freebsd/mount-all.rc.d.sh.in target/stamp.paths
-	@mkdir -p "$(dir $@)"
-	$(SUBST) "$<" >"$@"
+rust_test_sources = \
+	tests/common/mocks.rs \
+	tests/common/mod.rs \
+	tests/integration_test.rs \
+	tests/suites/cli_suite.rs \
+	tests/suites/get_key_suite.rs \
+	tests/suites/keep_alive_suite.rs \
+	tests/suites/list_keys_suite.rs \
+	tests/suites/luks_stage_keys_suite.rs \
+	tests/suites/mod.rs \
+	tests/suites/zfs_change_key_suite.rs \
+	tests/suites/zfs_create_suite.rs \
+	tests/suites/zfs_list_suite.rs \
+	tests/suites/zfs_load_key_suite.rs \
+	tests/suites/zpool_create_suite.rs
+
+all-local: $(rust_sources)

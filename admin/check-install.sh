@@ -27,22 +27,32 @@
 
 set -eu
 
-flavor="${ZKEYS_TEST_INSTALL_FLAVOR:-}"
-if [ -z "${flavor}" ]; then
-    case "$(uname -s)" in
-    FreeBSD)
-        flavor=freebsd
-        ;;
+readonly mtree="${1}"; shift
+readonly manifest="${1}"; shift
+readonly destdir="${1}"; shift
+readonly prefix="${1}"; shift
+readonly make="${1}"; shift
+# "${@}" contains extra make flags.
 
-    Linux)
-        flavor=linux
-        ;;
-
-    *)
-        echo "Cannot determine installer for this system" 1>&2
-        exit 1
-        ;;
-    esac
+if [ -z "${mtree}" ]; then
+    echo "ERROR: mtree is required for installcheck; run ./configure again" 1>&2
+    exit 1
 fi
 
-exec "./${flavor}/install.sh"
+"${mtree}" -f "${manifest}" -p "${destdir}${prefix}" || exit $?
+
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/zkeys-installcheck.XXXXXX")
+cleanup() {
+    rm -rf "${work_dir}"
+}
+trap cleanup EXIT HUP INT TERM QUIT
+
+"${make}" "${@}" DESTDIR="${work_dir}" install
+"${mtree}" -f "${manifest}" -p "${work_dir}${prefix}"
+
+"${make}" "${@}" DESTDIR="${work_dir}" uninstall
+leftover_files="$(find "${work_dir}" \! -type d)"
+if [ -n "${leftover_files}" ]; then
+    echo "ERROR: make uninstall left these behind: ${leftover_files}" 1>&2
+    exit 1
+fi

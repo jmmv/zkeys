@@ -6,7 +6,10 @@ name: install
 on: push
 
 jobs:
-    install-freebsd:
+    distcheck:
+        strategy:
+            matrix:
+                platform: [freebsd, linux]
         runs-on: ubuntu-latest
         env:
             RUSTC_WRAPPER: "sccache"
@@ -18,24 +21,16 @@ jobs:
               run: |
                   sudo apt update
                   sudo apt install --yes mtree-netbsd
-            - name: Install for FreeBSD
-              env:
-                  PREFIX: ${{ runner.temp }}/zkeys-prefix
-                  ZKEYS_TEST_INSTALL_FLAVOR: freebsd
+            - run: autoreconf -is
+            - name: Configure for ${{ matrix.platform }}
               run: |
-                  make PREFIX="${PREFIX}"
-                  make install PREFIX="${PREFIX}"
-                  mtree -f freebsd/install.mtree -p "${PREFIX}"
-            - name: Install for FreeBSD with DESTDIR
-              env:
-                  DESTDIR: ${{ runner.temp }}/zkeys-prefix
-                  ZKEYS_TEST_INSTALL_FLAVOR: freebsd
-              run: |
-                  make
-                  make install DESTDIR="${DESTDIR}"
-                  mtree -f freebsd/install.mtree -p "${DESTDIR}/usr/local"
+                  mkdir build
+                  cd build
+                  ../configure --with-platform=${{ matrix.platform }}
+            - name: Distribution check for ${{ matrix.platform }}
+              run: make -C build distcheck
 
-    install-linux:
+    linux-setup:
         runs-on: ubuntu-latest
         env:
             RUSTC_WRAPPER: "sccache"
@@ -47,22 +42,16 @@ jobs:
               run: |
                   sudo apt update
                   sudo apt install --yes mtree-netbsd
-            - name: Install for Linux
-              env:
-                  PREFIX: ${{ runner.temp }}/zkeys-prefix
-                  ZKEYS_TEST_INSTALL_FLAVOR: linux
-              run: |
-                  make PREFIX="${PREFIX}"
-                  make install PREFIX="${PREFIX}"
-                  mtree -f linux/install.mtree -p "${PREFIX}"
+            - run: autoreconf -is
             - name: Install for Linux with DESTDIR
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-destdir
-                  ZKEYS_TEST_INSTALL_FLAVOR: linux
               run: |
+                  mkdir build
+                  cd build
+                  ../configure --with-platform=linux
                   make
                   make install DESTDIR="${DESTDIR}"
-                  mtree -f linux/install.mtree -p "${DESTDIR}"
             - name: Post-install setup
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-destdir

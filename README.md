@@ -20,25 +20,42 @@ with dracut as well (such as Fedora) for unattended boot scenarios.
 
 Visit <https://zkeys.jmmv.dev/> for more details on the product.
 
-## Installation from source
+## Installation
 
-With a Rust toolchain and GNU Make installed, build and install the client with:
+### From a release archive (preferred)
+
+Install a Rust toolchain and GNU Make, and then run:
 
 ```sh
+$ mkdir build && cd build
+$ ../configure
 $ make
 $ sudo make install
 ```
 
-This installs to `/usr/local` by default.  To use another prefix, pass it to
-`make`:
+This installs to `/usr/local` by default.  To use another prefix, specify it
+when configuring the build:
 
 ```sh
-$ make install PREFIX=/opt/local
+$ ../configure --prefix=/opt/local
+$ make
+$ sudo make install
 ```
 
-Note that `make install` installs different payloads depending on the host OS,
-following common conventions on each platform.  This does _not_ configure the
-host to enable any zkeys services, however.
+The configure script selects the Linux or FreeBSD installation payload from
+the host operating system.  Packagers can override this with
+`--with-platform=linux` or `--with-platform=freebsd`.  This does _not_
+configure the host to enable any zkeys services, however.
+
+### From a Git checkout
+
+Install GNU Autoconf and GNU Automake, and then run:
+
+```sh
+$ autoreconf -is
+```
+
+Afterward, follow the installation instructions for a release archive above.
 
 ## Documentation
 
