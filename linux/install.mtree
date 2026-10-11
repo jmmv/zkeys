@@ -53,6 +53,7 @@
         doc type=dir mode=0755
             zkeys type=dir mode=0755
                 LICENSE type=file mode=0644
+                NEWS.md type=file mode=0644
                 NOTICE type=file mode=0644
                 README.linux.md type=file mode=0644
                 README.md type=file mode=0644

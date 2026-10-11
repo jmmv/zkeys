@@ -28,10 +28,11 @@ AUTOMAKE_OPTIONS = no-dependencies
 
 AM_DISTCHECK_CONFIGURE_FLAGS = --with-platform=$(ZKEYS_PLATFORM)
 
-dist_doc_DATA = LICENSE NOTICE README.md
+dist_doc_DATA = LICENSE NEWS.md NOTICE README.md
 
 BUILT_SOURCES =
 CLEANFILES =
+DIST_HOOKS =
 PHONY_TARGETS =
 
 rust_deps = \
@@ -86,8 +87,22 @@ $(cargo_target_dir)/debug/zkeys: Makefile $(rust_deps) $(rust_sources)
 check-local: $(rust_deps) $(rust_sources) $(rust_test_sources)
 	$(cargo_env) $(CARGO) test $(cargo_manifest) --locked
 
+# Replace Automake's builtin check-news functionality so that we can validate
+# the NEWS.md file instead of NEWS.
+DIST_HOOKS += check-news
+check-news: Makefile $(srcdir)/NEWS.md
+	@case "$$(sed 15q "$(srcdir)/NEWS.md")" in \
+	*"$(VERSION)"*) : ;; \
+	*) \
+	    echo "NEWS.md not updated; not releasing" 1>&2; \
+	    exit 1 \
+	    ;; \
+	esac
+
 clean-local:
 	$(cargo_env) $(CARGO) clean $(cargo_manifest)
+
+dist-hook: $(DIST_HOOKS)
 
 install-data-local: $(ZKEYS_PLATFORM)-install-data-local
 
