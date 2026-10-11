@@ -20,6 +20,9 @@ with dracut as well (such as Fedora) for unattended boot scenarios.
 
 Visit <https://zkeys.jmmv.dev/> for more details on the product.
 
+See the [release notes](NEWS.md) for information about the changes in this and
+all previous releases.
+
 ## Installation
 
 ### From a release archive (preferred)
