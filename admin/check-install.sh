@@ -27,19 +27,17 @@
 
 set -eu
 
-readonly mtree="${1}"; shift
+readonly mtree_tool="${1}"; shift
 readonly manifest="${1}"; shift
 readonly destdir="${1}"; shift
 readonly prefix="${1}"; shift
 readonly make="${1}"; shift
 # "${@}" contains extra make flags.
 
-if [ -z "${mtree}" ]; then
-    echo "ERROR: mtree is required for installcheck; run ./configure again" 1>&2
+if [ -z "${mtree_tool}" ]; then
+    echo "ERROR: mtree or bsdtar is required for installcheck; run ./configure again" 1>&2
     exit 1
 fi
-
-"${mtree}" -f "${manifest}" -p "${destdir}${prefix}" || exit $?
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/zkeys-installcheck.XXXXXX")
 cleanup() {
@@ -47,8 +45,41 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM QUIT
 
+# shellcheck disable=SC3043
+check_tree() {
+    local root="${1}"
+
+    case "${mtree_tool##*/}" in
+        bsdtar)
+            local expected="${work_dir}/expected.mtree"
+            local actual="${work_dir}/actual.mtree"
+            local options='!all,type,mode'
+
+            # Convert the expected and actual trees to the same canonical
+            # mtree format, then ignore their traversal order when comparing.
+            cd "${root}" && "${mtree_tool}" -cf "${expected}" \
+                --format=mtree --options="${options}" @"${manifest}"
+            "${mtree_tool}" -cf "${actual}" --format=mtree --options="${options}" -C "${root}" .
+            LC_ALL=C sort -o "${expected}" "${expected}"
+            LC_ALL=C sort -o "${actual}" "${actual}"
+            diff -u "${expected}" "${actual}"
+            ;;
+
+        mtree)
+            "${mtree_tool}" -f "${manifest}" -p "${root}"
+            ;;
+
+        *)
+            echo "ERROR: unsupported mtree tool ${mtree_tool}" 1>&2
+            exit 1
+            ;;
+    esac
+}
+
+check_tree "${destdir}${prefix}"
+
 "${make}" "${@}" DESTDIR="${work_dir}" install
-"${mtree}" -f "${manifest}" -p "${work_dir}${prefix}"
+check_tree "${work_dir}${prefix}"
 
 "${make}" "${@}" DESTDIR="${work_dir}" uninstall
 leftover_files="$(find "${work_dir}" \! -type d)"

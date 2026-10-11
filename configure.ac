@@ -43,9 +43,9 @@ AC_PATH_PROG([CARGO], [cargo])
 AS_IF([test -z "$CARGO"], [AC_MSG_ERROR([cargo is required])])
 AC_PATH_PROG([RUSTC], [rustc])
 AS_IF([test -z "$RUSTC"], [AC_MSG_ERROR([rustc is required])])
-AC_PATH_PROG([MTREE], [mtree])
+AC_PATH_PROGS([MTREE], [mtree bsdtar])
 AS_IF([test -z "$MTREE"], [
-    AC_MSG_WARN([mtree was not found; make installcheck and make distcheck will fail])
+    AC_MSG_WARN([neither mtree nor bsdtar was found; make installcheck and make distcheck will fail])
 ])
 
 AC_ARG_WITH(
