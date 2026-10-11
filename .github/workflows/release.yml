@@ -1,7 +1,7 @@
 # ZKeys
 # Copyright 2025 Julio Merino
 
-name: install
+name: release
 
 on: push
 
@@ -29,6 +29,13 @@ jobs:
                   ../configure --with-platform=${{ matrix.platform }}
             - name: Distribution check for ${{ matrix.platform }}
               run: make -C build distcheck
+            - name: Save source archive
+              if: matrix.platform == 'linux'
+              uses: actions/upload-artifact@v7
+              with:
+                  name: zkeys-source
+                  path: build/zkeys-*.tar.gz
+                  retention-days: 1
 
     linux-setup:
         runs-on: ubuntu-latest
@@ -65,3 +72,34 @@ jobs:
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-destdir
               run: systemd-analyze verify --man=no --recursive-errors=no --root="${DESTDIR}" /usr/local/lib/systemd/system/zkeys-keep-alive.service
+
+    publish:
+        if: startsWith(github.ref, 'refs/tags/zkeys-')
+        needs: [distcheck, linux-setup]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v6
+            - name: Generate release notes
+              id: release
+              run: |
+                  echo "version=${GITHUB_REF_NAME#zkeys-}" >>"${GITHUB_OUTPUT}"
+                  admin/release-notes.sh >notes.md
+            - name: Fetch source archive
+              uses: actions/download-artifact@v8
+              with:
+                  name: zkeys-source
+                  path: artifacts
+            - name: Publish release
+              uses: ncipollo/release-action@v1
+              with:
+                  allowUpdates: true
+                  replacesArtifacts: false
+                  name: zkeys ${{ steps.release.outputs.version }}
+                  bodyFile: notes.md
+                  draft: false
+                  prerelease: false
+                  artifacts: artifacts/zkeys-*.tar.gz
+                  artifactContentType: application/gzip
+                  token: ${{ secrets.GITHUB_TOKEN }}

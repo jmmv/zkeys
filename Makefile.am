@@ -41,8 +41,11 @@ rust_deps = \
 	rust-toolchain.toml
 
 EXTRA_DIST = \
+	RELEASE.md \
 	admin/check-install.sh \
 	admin/check-rust-sources.sh \
+	admin/release-notes.sh \
+	admin/update-version.sh \
 	prek.toml \
 	$(rust_deps) \
 	rustfmt.toml \
