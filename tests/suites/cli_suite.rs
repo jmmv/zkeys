@@ -50,9 +50,20 @@ Commands:
     zfs-load-key        load a key for a ZFS dataset
     zpool-create        create an encrypted ZFS pool
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
+        .stderr("");
+}
+
+#[test]
+fn test_version() {
+    let version = env!("CARGO_PKG_VERSION");
+    zkeys()
+        .arg("version")
+        .assert()
+        .code(0)
+        .stdout(format!("ZKeys {version}\nCopyright 2025-2026 Julio Merino\n"))
         .stderr("");
 }
 

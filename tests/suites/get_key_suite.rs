@@ -163,7 +163,7 @@ Options:
 Arguments:
     name                name of the key to retrieve
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
         .stderr("");

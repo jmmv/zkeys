@@ -256,7 +256,7 @@ Arguments:
 The final zfs-arg is the configured ZFS dataset name.
 Pass `--` before zfs-arg arguments that begin with a hyphen.
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
         .stderr("");
