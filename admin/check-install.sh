@@ -57,12 +57,13 @@ check_tree() {
 
             # Convert the expected and actual trees to the same canonical
             # mtree format, then ignore their traversal order when comparing.
-            cd "${root}" && "${mtree_tool}" -cf "${expected}" \
-                --format=mtree --options="${options}" @"${manifest}"
+            (cd "${root}" && "${mtree_tool}" -cf "${expected}" \
+                --format=mtree --options="${options}" @"${manifest}")
             "${mtree_tool}" -cf "${actual}" --format=mtree --options="${options}" -C "${root}" .
             LC_ALL=C sort -o "${expected}" "${expected}"
             LC_ALL=C sort -o "${actual}" "${actual}"
             diff -u "${expected}" "${actual}"
+            rm -f "${expected}" "${actual}"
             ;;
 
         mtree)
