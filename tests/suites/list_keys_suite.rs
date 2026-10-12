@@ -114,7 +114,7 @@ Options:
     --config-file FILE  path to the configuration file (default:
                         /non-existent/prefix/etc/zkeys.toml)
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
         .stderr("");

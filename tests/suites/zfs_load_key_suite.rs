@@ -264,7 +264,7 @@ Options:
 Arguments:
     [dataset]           ZFS dataset whose key to load
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
         .stderr("");

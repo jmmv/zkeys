@@ -293,4 +293,4 @@ fn app_setup(builder: Builder) -> Builder {
         )
 }
 
-tokio_app!("zkeys", app_setup, tokio_command_dispatcher);
+tokio_app!("ZKeys", app_setup, tokio_command_dispatcher);

@@ -291,7 +291,7 @@ Options:
 Arguments:
     [name1 .. nameN]    names of the keys to keep alive (default: all)
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
         .stderr("");

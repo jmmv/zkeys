@@ -194,7 +194,7 @@ Arguments:
 The pool name after zpool options must be a configured ZFS dataset.
 Pass `--` before zpool-arg arguments that begin with a hyphen.
 
-zkeys home page: https://zkeys.jmmv.dev/
+ZKeys home page: https://zkeys.jmmv.dev/
 "#,
         )
         .stderr("");

@@ -26,7 +26,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT(
-    [zkeys],
+    [ZKeys],
     m4_esyscmd_s([awk -F'"' '/^version = / { print $2; exit }' Cargo.toml]),
     [https://github.com/jmmv/zkeys/issues],
     [zkeys],
