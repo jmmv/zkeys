@@ -30,5 +30,4 @@
 ./etc/rc.d type=dir mode=0755
 ./etc/rc.d/zkeys-keep-alive type=file mode=0755
 ./etc/rc.d/zkeys-mount-all type=file mode=0755
-./etc/zkeys.toml.tmpl type=file mode=0600
 ./share/doc/zkeys/README.freebsd.md type=file mode=0644
