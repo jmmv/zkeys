@@ -3,12 +3,14 @@
 Makefile
 Makefile.in
 aclocal.m4
+all.mtree
 autom4te.cache
 config.log
 config.status
 config.toml
 configure
 configure~
+setup.sh
 target
 vscode-target
 zkeys-*.tar.gz

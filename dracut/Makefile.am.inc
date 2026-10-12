@@ -25,66 +25,40 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 EXTRA_DIST += \
-	linux/Makefile.am.inc \
-	linux/dracut/50zkeys/module-setup.sh.in \
-	linux/dracut/50zkeys/zkeys-cryptsetup.conf \
-	linux/dracut/50zkeys/zkeys-initrd.service \
-	linux/install.mtree \
-	linux/README.md \
-	linux/setup.sh.in \
-	linux/systemd/zkeys-keep-alive.service.in
+	dracut/Makefile.am.inc \
+	dracut/50zkeys/module-setup.sh.in \
+	dracut/50zkeys/zkeys-cryptsetup.conf \
+	dracut/50zkeys/zkeys-initrd.service \
+	dracut/install.mtree \
+	dracut/README.md
 
-linux_built_sources = \
-	linux/dracut/50zkeys/module-setup.sh \
-	linux/setup.sh \
-	linux/systemd/zkeys-keep-alive.service
+dracut_built_sources = dracut/50zkeys/module-setup.sh
 
-linux/dracut/50zkeys/module-setup.sh: \
-		$(srcdir)/linux/dracut/50zkeys/module-setup.sh.in Makefile
+dracut/50zkeys/module-setup.sh: \
+		$(srcdir)/dracut/50zkeys/module-setup.sh.in Makefile
 	$(AM_V_GEN)$(MKDIR_P) "$(dir $@)"
 	$(AM_V_at)$(do_subst) "$<" >"$@"
 	$(AM_V_at)chmod 755 "$@"
 
-linux/setup.sh: $(srcdir)/linux/setup.sh.in Makefile
-	$(AM_V_GEN)$(MKDIR_P) "$(dir $@)"
-	$(AM_V_at)$(do_subst) "$<" >"$@"
-	$(AM_V_at)chmod 755 "$@"
+BUILT_SOURCES += $(dracut_built_sources)
+CLEANFILES += $(dracut_built_sources)
 
-linux/systemd/zkeys-keep-alive.service: \
-		$(srcdir)/linux/systemd/zkeys-keep-alive.service.in Makefile
-	$(AM_V_GEN)$(MKDIR_P) "$(dir $@)"
-	$(AM_V_at)$(do_subst) "$<" >"$@"
-
-BUILT_SOURCES += $(linux_built_sources)
-CLEANFILES += $(linux_built_sources)
-
-PHONY_TARGETS += linux-install-data-local
-linux-install-data-local: $(linux_built_sources)
+PHONY_TARGETS += dracut-install-data-local
+dracut-install-data-local: $(dracut_built_sources)
 	$(MKDIR_P) "$(DESTDIR)$(docdir)"
-	$(INSTALL_DATA) "$(srcdir)/linux/README.md" \
-		"$(DESTDIR)$(docdir)/README.linux.md"
-	$(MKDIR_P) "$(DESTDIR)$(datadir)/examples/zkeys"
-	$(INSTALL) -m 600 "$(srcdir)/zkeys.toml.tmpl" \
-		"$(DESTDIR)$(datadir)/examples/zkeys/zkeys.toml"
+	$(INSTALL_DATA) "$(srcdir)/dracut/README.md" \
+		"$(DESTDIR)$(docdir)/README.dracut.md"
 	$(MKDIR_P) "$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys"
-	$(INSTALL_SCRIPT) linux/dracut/50zkeys/module-setup.sh \
+	$(INSTALL_SCRIPT) dracut/50zkeys/module-setup.sh \
 		"$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys/module-setup.sh"
-	$(INSTALL_DATA) "$(srcdir)/linux/dracut/50zkeys/zkeys-cryptsetup.conf" \
+	$(INSTALL_DATA) "$(srcdir)/dracut/50zkeys/zkeys-cryptsetup.conf" \
 		"$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys/zkeys-cryptsetup.conf"
-	$(INSTALL_DATA) "$(srcdir)/linux/dracut/50zkeys/zkeys-initrd.service" \
+	$(INSTALL_DATA) "$(srcdir)/dracut/50zkeys/zkeys-initrd.service" \
 		"$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys/zkeys-initrd.service"
-	$(MKDIR_P) "$(DESTDIR)$(libexecdir)/zkeys"
-	$(INSTALL_SCRIPT) linux/setup.sh "$(DESTDIR)$(libexecdir)/zkeys/setup.sh"
-	$(MKDIR_P) "$(DESTDIR)$(prefix)/lib/systemd/system"
-	$(INSTALL_DATA) linux/systemd/zkeys-keep-alive.service \
-		"$(DESTDIR)$(prefix)/lib/systemd/system/zkeys-keep-alive.service"
 
-PHONY_TARGETS += linux-uninstall-local
-linux-uninstall-local:
-	rm -f "$(DESTDIR)$(datadir)/examples/zkeys/zkeys.toml"
-	rm -f "$(DESTDIR)$(docdir)/README.linux.md"
+PHONY_TARGETS += dracut-uninstall-local
+dracut-uninstall-local:
+	rm -f "$(DESTDIR)$(docdir)/README.dracut.md"
 	rm -f "$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys/module-setup.sh"
 	rm -f "$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys/zkeys-cryptsetup.conf"
 	rm -f "$(DESTDIR)$(prefix)/lib/dracut/modules.d/50zkeys/zkeys-initrd.service"
-	rm -f "$(DESTDIR)$(libexecdir)/zkeys/setup.sh"
-	rm -f "$(DESTDIR)$(prefix)/lib/systemd/system/zkeys-keep-alive.service"

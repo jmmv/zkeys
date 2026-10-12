@@ -15,8 +15,8 @@ the whole purpose of ZKeys.
 
 ZKeys is named after ZFS as this project originated with the desire to automate
 unattended boots of FreeBSD machines in a secure fashion.  However, there is
-not much here that's ZFS-specific and, in fact, zkeys supports Linux systems
-with dracut as well (such as Fedora) for unattended boot scenarios.
+not much here that's ZFS-specific and so zkeys also provides dracut and systemd
+support for systems such as Fedora.
 
 Visit <https://zkeys.jmmv.dev/> for more details on the product.
 
@@ -50,10 +50,11 @@ $ make
 $ sudo make install
 ```
 
-The configure script selects the Linux or FreeBSD installation payload from
-the host operating system.  Packagers can override this with
-`--with-platform=linux` or `--with-platform=freebsd`.  This does _not_
-configure the host to enable any zkeys services, however.
+The configure script independently selects the dracut, FreeBSD, and systemd
+installation components based on the current OS and the presence of certain
+services.  You can customize what is and isn't installed via corresponding
+`--with-*` arguments.  Beware that these flags only change what is installed,
+not how zkeys is built.
 
 ### From a Git checkout
 
@@ -70,7 +71,8 @@ Afterward, follow the installation instructions for a release archive above.
 Once `zkeys` is installed, take a look at the `zkeys(8)` and `zkeys.toml(5)`
 manual pages for detailed usage and configuration information.
 
-For quick, platform-specific setup notes, see:
+For quick, component-specific setup notes, see:
 
+*   [dracut/README.md](dracut/README.md)
 *   [freebsd/README.md](freebsd/README.md)
-*   [linux/README.md](linux/README.md)
+*   [systemd/README.md](systemd/README.md)

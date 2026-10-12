@@ -26,7 +26,10 @@
 
 AUTOMAKE_OPTIONS = no-dependencies
 
-AM_DISTCHECK_CONFIGURE_FLAGS = --with-platform=$(ZKEYS_PLATFORM)
+AM_DISTCHECK_CONFIGURE_FLAGS = \
+	--with-dracut=$(ZKEYS_WITH_DRACUT) \
+	--with-freebsd=$(ZKEYS_WITH_FREEBSD) \
+	--with-systemd=$(ZKEYS_WITH_SYSTEMD)
 
 dist_doc_DATA = LICENSE NEWS.md NOTICE README.md
 
@@ -44,11 +47,14 @@ EXTRA_DIST = \
 	RELEASE.md \
 	admin/check-install.sh \
 	admin/check-rust-sources.sh \
+	admin/merge-mtree.awk \
 	admin/release-notes.sh \
 	admin/update-version.sh \
+	install.mtree \
 	prek.toml \
 	$(rust_deps) \
 	rustfmt.toml \
+	setup.sh.in \
 	zkeys.toml.tmpl
 
 do_subst = sed \
@@ -57,10 +63,29 @@ do_subst = sed \
 	-e 's|@PREFIX@|$(prefix)|g' \
 	-e 's|@SYSCONFDIR@|$(sysconfdir)|g'
 
+include $(srcdir)/dracut/Makefile.am.inc
 include $(srcdir)/freebsd/Makefile.am.inc
-include $(srcdir)/linux/Makefile.am.inc
 include $(srcdir)/man/Makefile.am.inc
 include $(srcdir)/src/Makefile.am.inc
+include $(srcdir)/systemd/Makefile.am.inc
+
+setup.sh: $(srcdir)/setup.sh.in Makefile
+	$(AM_V_GEN)$(do_subst) "$<" >"$@"
+	$(AM_V_at)chmod 755 "$@"
+BUILT_SOURCES += setup.sh
+CLEANFILES += setup.sh
+
+component_install_targets = $(addsuffix -install-data-local,$(ZKEYS_COMPONENTS))
+component_uninstall_targets = $(addsuffix -uninstall-local,$(ZKEYS_COMPONENTS))
+mtree_manifests = \
+	$(srcdir)/install.mtree \
+	$(addprefix $(srcdir)/,$(addsuffix /install.mtree,$(ZKEYS_COMPONENTS)))
+
+all.mtree: Makefile $(mtree_manifests) $(srcdir)/admin/merge-mtree.awk
+	$(AM_V_GEN)$(AWK) -f "$(srcdir)/admin/merge-mtree.awk" \
+		$(mtree_manifests) >"$@"
+BUILT_SOURCES += all.mtree
+CLEANFILES += all.mtree
 
 cargo_target_dir = $(abs_top_builddir)/target
 cargo_env = \
@@ -107,20 +132,33 @@ clean-local:
 
 dist-hook: $(DIST_HOOKS)
 
-install-data-local: $(ZKEYS_PLATFORM)-install-data-local
+PHONY_TARGETS += base-install-data-local
+base-install-data-local: setup.sh
+	$(MKDIR_P) "$(DESTDIR)$(datadir)/examples/zkeys"
+	$(INSTALL) -m 600 "$(srcdir)/zkeys.toml.tmpl" \
+		"$(DESTDIR)$(datadir)/examples/zkeys/zkeys.toml"
+	$(MKDIR_P) "$(DESTDIR)$(libexecdir)/zkeys"
+	$(INSTALL_SCRIPT) setup.sh "$(DESTDIR)$(libexecdir)/zkeys/setup.sh"
+
+install-data-local: base-install-data-local $(component_install_targets)
 
 install-exec-local:
 	$(MKDIR_P) "$(DESTDIR)$(sbindir)"
 	$(INSTALL_PROGRAM) "$(cargo_target_dir)/release/zkeys" \
 		"$(DESTDIR)$(sbindir)/zkeys"
 
-uninstall-local: $(ZKEYS_PLATFORM)-uninstall-local
+PHONY_TARGETS += base-uninstall-local
+base-uninstall-local:
+	rm -f "$(DESTDIR)$(datadir)/examples/zkeys/zkeys.toml"
+	rm -f "$(DESTDIR)$(libexecdir)/zkeys/setup.sh"
+
+uninstall-local: $(component_uninstall_targets) base-uninstall-local
 	rm -f "$(DESTDIR)$(sbindir)/zkeys"
 
-installcheck-local:
+installcheck-local: all.mtree
 	"$(abs_top_srcdir)/admin/check-install.sh" \
 		"$(MTREE)" \
-		"$(abs_top_srcdir)/$(ZKEYS_PLATFORM)/install.mtree" \
+		"$(abs_top_builddir)/all.mtree" \
 		"$(DESTDIR)" \
 		"$(prefix)" \
 		"$(MAKE)" $(AM_MAKEFLAGS)
