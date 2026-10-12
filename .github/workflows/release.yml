@@ -7,9 +7,6 @@ on: push
 
 jobs:
     distcheck:
-        strategy:
-            matrix:
-                platform: [freebsd, linux]
         runs-on: ubuntu-latest
         env:
             RUSTC_WRAPPER: "sccache"
@@ -22,22 +19,35 @@ jobs:
                   sudo apt update
                   sudo apt install --yes mtree-netbsd
             - run: autoreconf -is
-            - name: Configure for ${{ matrix.platform }}
+            - name: Configure with all components
               run: |
                   mkdir build
                   cd build
-                  ../configure --with-platform=${{ matrix.platform }}
-            - name: Distribution check for ${{ matrix.platform }}
+                  ../configure \
+                      --with-dracut=yes \
+                      --with-freebsd=yes \
+                      --with-systemd=yes
+            - name: Distribution check
               run: make -C build distcheck
             - name: Save source archive
-              if: matrix.platform == 'linux'
               uses: actions/upload-artifact@v7
               with:
                   name: zkeys-source
                   path: build/zkeys-*.tar.gz
                   retention-days: 1
 
-    linux-setup:
+    components:
+        strategy:
+            matrix:
+                include:
+                    - name: base
+                      flags: --with-dracut=no --with-freebsd=no --with-systemd=no
+                    - name: dracut
+                      flags: --with-dracut=yes --with-freebsd=no --with-systemd=no
+                    - name: freebsd
+                      flags: --with-dracut=no --with-freebsd=yes --with-systemd=no
+                    - name: systemd
+                      flags: --with-dracut=no --with-freebsd=no --with-systemd=yes
         runs-on: ubuntu-latest
         env:
             RUSTC_WRAPPER: "sccache"
@@ -50,32 +60,81 @@ jobs:
                   sudo apt update
                   sudo apt install --yes mtree-netbsd
             - run: autoreconf -is
-            - name: Install for Linux with DESTDIR
+            - name: Configure for ${{ matrix.name }}
+              run: |
+                  mkdir build
+                  cd build
+                  ../configure ${{ matrix.flags }}
+            - name: Check installation for ${{ matrix.name }}
+              env:
+                  DESTDIR: ${{ runner.temp }}/zkeys-destdir
+              run: |
+                  make -C build
+                  make -C build install DESTDIR="${DESTDIR}"
+                  make -C build installcheck DESTDIR="${DESTDIR}"
+
+    linux-setup:
+        strategy:
+            matrix:
+                include:
+                    - name: base
+                      dracut: no
+                      systemd: no
+                    - name: dracut
+                      dracut: yes
+                      systemd: no
+                    - name: systemd
+                      dracut: no
+                      systemd: yes
+                    - name: dracut-systemd
+                      dracut: yes
+                      systemd: yes
+        runs-on: ubuntu-latest
+        env:
+            RUSTC_WRAPPER: "sccache"
+            SCCACHE_GHA_ENABLED: "true"
+        steps:
+            - uses: actions/checkout@v6
+            - uses: mozilla-actions/sccache-action@v0.0.9
+            - name: Install mtree
+              run: |
+                  sudo apt update
+                  sudo apt install --yes mtree-netbsd
+            - run: autoreconf -is
+            - name: Install ${{ matrix.name }} with DESTDIR
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-destdir
               run: |
                   mkdir build
                   cd build
-                  ../configure --with-platform=linux
+                  ../configure \
+                      --with-dracut=${{ matrix.dracut }} \
+                      --with-freebsd=no \
+                      --with-systemd=${{ matrix.systemd }}
                   make
                   make install DESTDIR="${DESTDIR}"
             - name: Post-install setup
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-destdir
               run: |
-                  test ! -e "${DESTDIR}/etc/zkeys.toml"
+                  test ! -e "${DESTDIR}/usr/local/etc/zkeys.toml"
                   test ! -e "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys"
                   "${DESTDIR}/usr/local/libexec/zkeys/setup.sh"
-                  test -f "${DESTDIR}/etc/zkeys.toml"
-                  test "$(readlink "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys")" = "/usr/local/lib/dracut/modules.d/50zkeys"
+                  test -f "${DESTDIR}/usr/local/etc/zkeys.toml"
+                  if test "${{ matrix.dracut }}" = yes; then
+                      test "$(readlink "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys")" = "/usr/local/lib/dracut/modules.d/50zkeys"
+                  else
+                      test ! -e "${DESTDIR}/usr/lib/dracut/modules.d/50zkeys"
+                  fi
             - name: Verify systemd unit
+              if: matrix.systemd == 'yes'
               env:
                   DESTDIR: ${{ runner.temp }}/zkeys-destdir
               run: systemd-analyze verify --man=no --recursive-errors=no --root="${DESTDIR}" /usr/local/lib/systemd/system/zkeys-keep-alive.service
 
     publish:
         if: startsWith(github.ref, 'refs/tags/zkeys-')
-        needs: [distcheck, linux-setup]
+        needs: [components, distcheck, linux-setup]
         runs-on: ubuntu-latest
         permissions:
             contents: write

@@ -24,37 +24,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-. type=dir
-    sbin type=dir mode=0755
-        zkeys type=file mode=0755
-    ..
-    etc type=dir mode=0755
-        newsyslog.conf.d type=dir mode=0755
-            zkeys.conf type=file mode=0644
-        ..
-        rc.d type=dir mode=0755
-            zkeys-keep-alive type=file mode=0755
-            zkeys-mount-all type=file mode=0755
-        ..
-        zkeys.toml.tmpl type=file mode=0600
-    ..
-    share type=dir mode=0755
-        doc type=dir mode=0755
-            zkeys type=dir mode=0755
-                LICENSE type=file mode=0644
-                NEWS.md type=file mode=0644
-                NOTICE type=file mode=0644
-                README.freebsd.md type=file mode=0644
-                README.md type=file mode=0644
-            ..
-        ..
-        man type=dir mode=0755
-            man5 type=dir mode=0755
-                zkeys.toml.5 type=file mode=0644
-            ..
-            man8 type=dir mode=0755
-                zkeys.8 type=file mode=0644
-            ..
-        ..
-    ..
-..
+./etc type=dir mode=0755
+./etc/newsyslog.conf.d type=dir mode=0755
+./etc/newsyslog.conf.d/zkeys.conf type=file mode=0644
+./etc/rc.d type=dir mode=0755
+./etc/rc.d/zkeys-keep-alive type=file mode=0755
+./etc/rc.d/zkeys-mount-all type=file mode=0755
+./etc/zkeys.toml.tmpl type=file mode=0600
+./share/doc/zkeys/README.freebsd.md type=file mode=0644

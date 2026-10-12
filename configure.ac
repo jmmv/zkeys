@@ -39,6 +39,7 @@ AC_CONFIG_SRCDIR([Cargo.toml])
 
 AM_INIT_AUTOMAKE([1.16 foreign no-dependencies subdir-objects])
 
+AC_PROG_AWK
 AC_PATH_PROG([CARGO], [cargo])
 AS_IF([test -z "$CARGO"], [AC_MSG_ERROR([cargo is required])])
 AC_PATH_PROG([RUSTC], [rustc])
@@ -49,29 +50,73 @@ AS_IF([test -z "$MTREE"], [
 ])
 
 AC_ARG_WITH(
-    [platform],
+    [dracut],
     [AS_HELP_STRING(
-        [--with-platform=auto|linux|freebsd],
-        [payload to install (default: auto)])],
-    [zkeys_platform="$withval"],
-    [zkeys_platform=auto])
+        [--with-dracut=auto|yes|no],
+        [install the dracut integration (default: auto)])],
+    [zkeys_with_dracut="$withval"],
+    [zkeys_with_dracut=auto])
+AS_CASE(
+    [$zkeys_with_dracut],
+    [auto], [
+        AC_CHECK_PROG([zkeys_dracut_detected], [dracut], [yes], [no])
+        zkeys_with_dracut="$zkeys_dracut_detected"
+    ],
+    [yes|no], [],
+    [AC_MSG_ERROR([invalid value for --with-dracut: $zkeys_with_dracut])])
 
-AS_IF([test "x$zkeys_platform" = xauto], [
+AC_ARG_WITH(
+    [freebsd],
+    [AS_HELP_STRING(
+        [--with-freebsd=auto|yes|no],
+        [install the FreeBSD integration (default: auto)])],
+    [zkeys_with_freebsd="$withval"],
+    [zkeys_with_freebsd=auto])
+AS_IF([test "x$zkeys_with_freebsd" = xauto], [
     AS_CASE(
         [$host_os],
-        [linux*], [zkeys_platform=linux],
-        [freebsd*], [zkeys_platform=freebsd],
-        [AC_MSG_ERROR([unsupported host operating system $host_os; use --with-platform])])
+        [freebsd*], [zkeys_with_freebsd=yes],
+        [zkeys_with_freebsd=no])
 ])
 AS_CASE(
-    [$zkeys_platform],
-    [linux|freebsd], [],
-    [AC_MSG_ERROR([invalid platform $zkeys_platform; expected auto, linux, or freebsd])])
+    [$zkeys_with_freebsd],
+    [yes|no], [],
+    [AC_MSG_ERROR([invalid value for --with-freebsd: $zkeys_with_freebsd])])
 
-AS_IF([test "x$zkeys_platform" = xlinux && test "x$sysconfdir" = 'x${prefix}/etc'], [
-    sysconfdir=/etc
+AC_ARG_WITH(
+    [systemd],
+    [AS_HELP_STRING(
+        [--with-systemd=auto|yes|no],
+        [install the systemd integration (default: auto)])],
+    [zkeys_with_systemd="$withval"],
+    [zkeys_with_systemd=auto])
+AS_CASE(
+    [$zkeys_with_systemd],
+    [auto], [
+        AC_CHECK_PROG([zkeys_systemd_detected], [systemctl], [yes], [no])
+        zkeys_with_systemd="$zkeys_systemd_detected"
+    ],
+    [yes|no], [],
+    [AC_MSG_ERROR([invalid value for --with-systemd: $zkeys_with_systemd])])
+
+zkeys_components=
+AS_IF([test "x$zkeys_with_dracut" = xyes], [
+    zkeys_components="$zkeys_components dracut"
+])
+AS_IF([test "x$zkeys_with_freebsd" = xyes], [
+    zkeys_components="$zkeys_components freebsd"
+])
+AS_IF([test "x$zkeys_with_systemd" = xyes], [
+    zkeys_components="$zkeys_components systemd"
 ])
 
-AC_SUBST([ZKEYS_PLATFORM], [$zkeys_platform])
+AC_SUBST([ZKEYS_COMPONENTS], [$zkeys_components])
+AC_SUBST([ZKEYS_WITH_DRACUT], [$zkeys_with_dracut])
+AC_SUBST([ZKEYS_WITH_FREEBSD], [$zkeys_with_freebsd])
+AC_SUBST([ZKEYS_WITH_SYSTEMD], [$zkeys_with_systemd])
+
+zkeys_component_summary=${zkeys_components# }
+AS_IF([test -z "$zkeys_component_summary"], [zkeys_component_summary=none])
+AC_MSG_NOTICE([selected components: $zkeys_component_summary])
 
 AC_OUTPUT

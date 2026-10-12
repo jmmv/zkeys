@@ -1,12 +1,11 @@
-# Linux setup
+# dracut setup
 
-This assumes a distribution with systemd and dracut and has been tested with
-Fedora 44.
+This has been tested with Fedora 44.
 
-The systemd/dracut installation supports LUKS volumes needed before the root
-file system is available and thus allows handling full-disk encryption
-scenarios.  zkeys installs a dracut module that copies the client and
-`/etc/zkeys.toml` into the initramfs.
+The dracut installation supports LUKS volumes needed before the root file
+system is available and thus allows handling full-disk encryption scenarios.
+zkeys installs a dracut module that copies the client and the configured
+`zkeys.toml` into the initramfs.
 
 Fedora packages dracut's NetworkManager integration separately.  Install it
 before running `make install` or rebuilding the initramfs:
@@ -21,27 +20,18 @@ Then run the installed setup script once:
 $ sudo /usr/local/libexec/zkeys/setup.sh
 ```
 
-This creates `/etc/zkeys.toml` from the installed example if the file does not
-already exist, links the prefix-owned dracut module into
-`/usr/lib/dracut/modules.d`, and enables the systemd `keep-alive` systemd
-service without starting it.  Think of this as a post-`make install` step to
-activate files that don't belong in `PREFIX` because dracut only recognizes
-files in the system-managed `/usr/lib/dracut/` directory.
+This creates the configured `zkeys.toml` from the installed example if the
+file does not already exist and, if the link doesn't already exist, links the
+prefix-owned dracut module into `/usr/lib/dracut/modules.d`.  Think of this as
+a post-`make install` step to activate files that don't belong in `PREFIX`
+because dracut only recognizes files in the system-managed
+`/usr/lib/dracut/` directory.
 
 Once that is done, follow these steps:
 
-1.   Start the keep-alive service to ensure keys remain unlocked from now on:
-
-    ```sh
-    $ sudo systemctl start zkeys-keep-alive.service
-    ```
-
-    Use `journalctl -u zkeys-keep-alive.service` to verify that the service
-    succeeds at sending the keep-alive messages.
-
 1.  Find the LUKS mapper name in the first field of its existing
     `/etc/crypttab` entry and associate that name with the ZKeys key for it
-    in the `/etc/zkeys.toml` file:
+    in the configured `zkeys.toml` file:
 
     ```toml
     [luks."<mapper-name>"]
@@ -101,7 +91,7 @@ Once that is done, follow these steps:
     Other distributions may require different boot loader tooling to persist
     the same `rd.neednet=1 ip=dhcp` kernel command-line options.
 
-    Rebuild the initramfs whenever `/etc/zkeys.toml` changes.
+    Rebuild the initramfs whenever the configured `zkeys.toml` changes.
 
 During boot, the initramfs brings up wired DHCP networking and stages keys in
 `/run/cryptsetup-keys.d`.  If retrieval fails or takes more than 30 seconds,

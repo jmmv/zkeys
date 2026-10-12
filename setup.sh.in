@@ -60,8 +60,7 @@ setup_config() {
 }
 
 setup_dracut() {
-    [ -d "${ROOT}${DRACUT_MODULE}" ] \
-        || err "Cannot find the ZKeys dracut module at ${DRACUT_MODULE}"
+    [ -d "${ROOT}${DRACUT_MODULE}" ] || return 0
     [ "${DRACUT_MODULE}" != "${DRACUT_LINK}" ] || return
 
     log install -m 755 -d "${ROOT}$(dirname "${DRACUT_LINK}")"
@@ -76,8 +75,7 @@ setup_dracut() {
 }
 
 setup_systemd() {
-    [ -f "${ROOT}${SYSTEMD_UNIT}" ] \
-        || err "Cannot find the ZKeys systemd unit at ${SYSTEMD_UNIT}"
+    [ -f "${ROOT}${SYSTEMD_UNIT}" ] || return 0
 
     if [ -n "${ROOT}" ]; then
         systemctl --root="${ROOT}" enable "${SYSTEMD_UNIT}"
