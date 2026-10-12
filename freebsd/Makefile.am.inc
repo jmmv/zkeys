@@ -55,8 +55,6 @@ freebsd-install-data-local: $(freebsd_built_sources)
 	$(INSTALL_DATA) "$(srcdir)/freebsd/README.md" \
 		"$(DESTDIR)$(docdir)/README.freebsd.md"
 	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)"
-	$(INSTALL) -m 600 "$(srcdir)/zkeys.toml.tmpl" \
-		"$(DESTDIR)$(sysconfdir)/zkeys.toml.tmpl"
 	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/newsyslog.conf.d"
 	$(INSTALL_DATA) "$(srcdir)/freebsd/newsyslog.conf" \
 		"$(DESTDIR)$(sysconfdir)/newsyslog.conf.d/zkeys.conf"
@@ -68,7 +66,6 @@ freebsd-install-data-local: $(freebsd_built_sources)
 
 PHONY_TARGETS += freebsd-uninstall-local
 freebsd-uninstall-local:
-	rm -f "$(DESTDIR)$(sysconfdir)/zkeys.toml.tmpl"
 	rm -f "$(DESTDIR)$(sysconfdir)/newsyslog.conf.d/zkeys.conf"
 	rm -f "$(DESTDIR)$(sysconfdir)/rc.d/zkeys-keep-alive"
 	rm -f "$(DESTDIR)$(sysconfdir)/rc.d/zkeys-mount-all"

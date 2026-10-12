@@ -1,8 +1,15 @@
 # FreeBSD setup
 
 1.  If you don't have `/usr/local/etc/zkeys.toml` yet, use
-    `/usr/local/etc/zkeys.toml.tmpl` as your starting template.  Make sure
-    the file is root-protected before adding secrets to it.
+    `/usr/local/share/examples/zkeys/zkeys.toml` as your starting
+    template.  Make sure the file is root-protected before adding secrets
+    to it.
+
+    You can run this command as root to accomplish the same:
+
+    ```sh
+    /usr/local/libexec/zkeys/setup.sh
+    ```
 
 1.  Once you have added secrets, enable and start the installed service:
 
