@@ -1,5 +1,5 @@
 #!/bin/sh
-# zkeys
+# ZKeys
 # Copyright 2026 Julio Merino.
 # All rights reserved.
 #
