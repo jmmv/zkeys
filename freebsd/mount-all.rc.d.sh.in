@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC1091,SC2034
-# zkeys
+# ZKeys
 # Copyright 2026 Julio Merino.
 # All rights reserved.
 #

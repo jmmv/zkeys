@@ -1,5 +1,6 @@
 # ZKeys
 # Copyright 2026 Julio Merino.
+# All rights reserved.
 
 [[repos]]
 repo = "https://github.com/pre-commit/pre-commit-hooks"
