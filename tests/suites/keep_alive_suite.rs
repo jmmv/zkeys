@@ -89,26 +89,12 @@ async fn test_refresh_period_changes() {
     let password = "remote-password";
     let mut service = MockService::start(StatusCode::OK, "").await;
     for response in [
-        KeepAliveResponse {
-            body: "",
-            refresh_period: Some("0"),
-            retry_initial_period: None,
-            retry_max_period: None,
-            status: StatusCode::OK,
-        },
-        KeepAliveResponse {
-            body: "",
-            refresh_period: Some("1"),
-            retry_initial_period: None,
-            retry_max_period: None,
-            status: StatusCode::OK,
-        },
+        KeepAliveResponse { refresh_period: Some("0"), ..Default::default() },
+        KeepAliveResponse { refresh_period: Some("1"), ..Default::default() },
         KeepAliveResponse {
             body: "Entity not found",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
+            ..Default::default()
         },
     ] {
         service.add_keep_alive_response(response).await;
@@ -143,74 +129,46 @@ async fn test_retries_failures_and_ignores_invalid_recommendations() {
     let mut service = MockService::start(StatusCode::OK, "").await;
     for response in [
         KeepAliveResponse {
-            body: "",
-            refresh_period: None,
             retry_initial_period: Some("7"),
             retry_max_period: Some("14"),
-            status: StatusCode::OK,
+            ..Default::default()
         },
         KeepAliveResponse {
             body: "Access denied: Invalid key credentials",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::FORBIDDEN,
+            ..Default::default()
         },
         KeepAliveResponse {
             body: "Service temporarily unavailable",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::INTERNAL_SERVER_ERROR,
+            ..Default::default()
         },
         KeepAliveResponse {
             body: "Too many requests",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::TOO_MANY_REQUESTS,
+            ..Default::default()
         },
+        KeepAliveResponse { refresh_period: Some("invalid"), ..Default::default() },
+        KeepAliveResponse { retry_initial_period: Some("5"), ..Default::default() },
         KeepAliveResponse {
-            body: "",
-            refresh_period: Some("invalid"),
-            retry_initial_period: None,
-            retry_max_period: None,
-            status: StatusCode::OK,
-        },
-        KeepAliveResponse {
-            body: "",
-            refresh_period: None,
-            retry_initial_period: Some("5"),
-            retry_max_period: None,
-            status: StatusCode::OK,
-        },
-        KeepAliveResponse {
-            body: "",
-            refresh_period: None,
             retry_initial_period: Some("invalid"),
             retry_max_period: Some("60"),
-            status: StatusCode::OK,
+            ..Default::default()
         },
         KeepAliveResponse {
-            body: "",
-            refresh_period: None,
             retry_initial_period: Some("0"),
             retry_max_period: Some("60"),
-            status: StatusCode::OK,
+            ..Default::default()
         },
         KeepAliveResponse {
-            body: "",
-            refresh_period: None,
             retry_initial_period: Some("70"),
             retry_max_period: Some("60"),
-            status: StatusCode::OK,
+            ..Default::default()
         },
         KeepAliveResponse {
             body: "Entity not found",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
+            ..Default::default()
         },
     ] {
         service.add_keep_alive_response(response).await;
@@ -249,17 +207,13 @@ async fn test_all_keys() {
     for response in [
         KeepAliveResponse {
             body: "Entity not found",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
+            ..Default::default()
         },
         KeepAliveResponse {
             body: "Entity not found",
-            refresh_period: None,
-            retry_initial_period: None,
-            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
+            ..Default::default()
         },
     ] {
         service.add_keep_alive_response(response).await;
@@ -292,10 +246,8 @@ async fn test_selected_keys() {
     let mut service = MockService::start(StatusCode::OK, "").await;
     for response in [KeepAliveResponse {
         body: "Entity not found",
-        refresh_period: None,
-        retry_initial_period: None,
-        retry_max_period: None,
         status: StatusCode::NOT_FOUND,
+        ..Default::default()
     }] {
         service.add_keep_alive_response(response).await;
     }
