@@ -83,6 +83,18 @@ pub(crate) struct KeepAliveResponse {
     pub(crate) status: StatusCode,
 }
 
+impl Default for KeepAliveResponse {
+    fn default() -> Self {
+        Self {
+            body: "",
+            refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
+            status: StatusCode::OK,
+        }
+    }
+}
+
 /// State shared by the mock endpoints.
 struct MockState {
     /// Status to return to the client.
