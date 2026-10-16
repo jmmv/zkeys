@@ -68,7 +68,7 @@ pub async fn zfs_create(config: Config, quiet: bool, args: &[String]) -> io::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Key, ZfsDataset};
+    use crate::config::{Key, RetryPolicy, ZfsDataset};
     use crate::service::KeySecret;
     use crate::service::testutils::MockService;
     use crate::zfs::testutils::MockZfs;
@@ -95,6 +95,7 @@ mod tests {
         zfs.insert("pool/test".to_owned(), ZfsDataset { key: "test".to_owned() });
         Config {
             default_key_refresh_period: Duration::from_secs(300),
+            default_key_retry_policy: RetryPolicy::default(),
             keys,
             service_url: Url::parse("http://unused.example/").unwrap(),
             luks: HashMap::default(),

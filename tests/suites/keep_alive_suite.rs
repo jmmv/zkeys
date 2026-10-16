@@ -89,11 +89,25 @@ async fn test_refresh_period_changes() {
     let password = "remote-password";
     let mut service = MockService::start(StatusCode::OK, "").await;
     for response in [
-        KeepAliveResponse { body: "", refresh_period: Some("0"), status: StatusCode::OK },
-        KeepAliveResponse { body: "", refresh_period: Some("1"), status: StatusCode::OK },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: Some("0"),
+            retry_initial_period: None,
+            retry_max_period: None,
+            status: StatusCode::OK,
+        },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: Some("1"),
+            retry_initial_period: None,
+            retry_max_period: None,
+            status: StatusCode::OK,
+        },
         KeepAliveResponse {
             body: "Entity not found",
             refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
         },
     ] {
@@ -124,25 +138,78 @@ async fn test_refresh_period_changes() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_retries_failures_with_previous_period() {
+async fn test_retries_failures_and_ignores_invalid_recommendations() {
     let password = "remote-password";
     let mut service = MockService::start(StatusCode::OK, "").await;
     for response in [
-        KeepAliveResponse { body: "", refresh_period: None, status: StatusCode::OK },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: None,
+            retry_initial_period: Some("7"),
+            retry_max_period: Some("14"),
+            status: StatusCode::OK,
+        },
         KeepAliveResponse {
             body: "Access denied: Invalid key credentials",
             refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
             status: StatusCode::FORBIDDEN,
         },
         KeepAliveResponse {
             body: "Service temporarily unavailable",
             refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
             status: StatusCode::INTERNAL_SERVER_ERROR,
         },
-        KeepAliveResponse { body: "", refresh_period: Some("invalid"), status: StatusCode::OK },
+        KeepAliveResponse {
+            body: "Too many requests",
+            refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
+            status: StatusCode::TOO_MANY_REQUESTS,
+        },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: Some("invalid"),
+            retry_initial_period: None,
+            retry_max_period: None,
+            status: StatusCode::OK,
+        },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: None,
+            retry_initial_period: Some("5"),
+            retry_max_period: None,
+            status: StatusCode::OK,
+        },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: None,
+            retry_initial_period: Some("invalid"),
+            retry_max_period: Some("60"),
+            status: StatusCode::OK,
+        },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: None,
+            retry_initial_period: Some("0"),
+            retry_max_period: Some("60"),
+            status: StatusCode::OK,
+        },
+        KeepAliveResponse {
+            body: "",
+            refresh_period: None,
+            retry_initial_period: Some("70"),
+            retry_max_period: Some("60"),
+            status: StatusCode::OK,
+        },
         KeepAliveResponse {
             body: "Entity not found",
             refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
         },
     ] {
@@ -162,8 +229,15 @@ async fn test_retries_failures_with_previous_period() {
     assert_eq!(Some(0), output.status.code());
     assert!(stderr.contains("HTTP 403 Forbidden"));
     assert!(stderr.contains("HTTP 500 Internal Server Error"));
-    assert!(stderr.contains("Invalid key refresh period header \"invalid\""));
-    for _ in 0..5 {
+    assert!(stderr.contains("HTTP 429 Too Many Requests"));
+    assert!(stderr.contains("Ignoring invalid refresh period recommendation for key test"));
+    assert!(stderr.contains("Invalid X-Key-Refresh-Period-Seconds header \"invalid\""));
+    assert!(stderr.contains("Ignoring invalid retry policy recommendation for key test"));
+    assert!(stderr.contains("Service returned an incomplete key retry policy"));
+    assert!(stderr.contains("Invalid X-Key-Retry-Initial-Period-Seconds header \"invalid\""));
+    assert!(stderr.contains("Initial retry period must be greater than zero"));
+    assert!(stderr.contains("Initial retry period cannot exceed maximum retry period"));
+    for _ in 0..10 {
         service.check_request(KEY_ID_1, password).await;
     }
     service.shutdown().await;
@@ -176,11 +250,15 @@ async fn test_all_keys() {
         KeepAliveResponse {
             body: "Entity not found",
             refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
         },
         KeepAliveResponse {
             body: "Entity not found",
             refresh_period: None,
+            retry_initial_period: None,
+            retry_max_period: None,
             status: StatusCode::NOT_FOUND,
         },
     ] {
@@ -215,6 +293,8 @@ async fn test_selected_keys() {
     for response in [KeepAliveResponse {
         body: "Entity not found",
         refresh_period: None,
+        retry_initial_period: None,
+        retry_max_period: None,
         status: StatusCode::NOT_FOUND,
     }] {
         service.add_keep_alive_response(response).await;

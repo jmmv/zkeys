@@ -27,9 +27,9 @@
 //! `keep-alive` command implementation.
 
 use crate::Config;
-use crate::config::Key;
-use crate::service::{HttpService, KeepAliveResult, Service};
-use log::{error, info};
+use crate::config::{Key, RetryPolicy};
+use crate::service::{HttpService, KeepAliveError, KeepAliveResult, Recommendation, Service};
+use log::{error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::time::Duration;
@@ -59,8 +59,14 @@ struct ActiveKey {
     /// Time at which to issue the next request.
     next_due: Instant,
 
-    /// Period to retain when a request fails.
-    period: Duration,
+    /// Normal period between successful requests.
+    normal_period: Duration,
+
+    /// Period to use for the next transient failure.
+    retry_period: Duration,
+
+    /// Retry limits currently in effect.
+    retry_policy: RetryPolicy,
 }
 
 /// Builds the list of keys to refresh.
@@ -71,7 +77,6 @@ struct ActiveKey {
 fn select_keys<C: Clock>(
     config: &Config,
     filter: &[String],
-    default_period: Duration,
     clock: &C,
 ) -> io::Result<HashMap<String, ActiveKey>> {
     let mut names = HashSet::new();
@@ -96,37 +101,85 @@ fn select_keys<C: Clock>(
         .map(|name| {
             (
                 name.clone(),
-                ActiveKey { key: config.keys[name].clone(), next_due: now, period: default_period },
+                ActiveKey {
+                    key: config.keys[name].clone(),
+                    next_due: now,
+                    normal_period: config.default_key_refresh_period,
+                    retry_period: config.default_key_retry_policy.initial_period(),
+                    retry_policy: config.default_key_retry_policy,
+                },
             )
         })
         .collect())
+}
+
+/// Resolves a service recommendation against the current and configured values.
+fn resolve_recommendation<T: Copy>(
+    name: &str,
+    kind: &str,
+    recommendation: Recommendation<T>,
+    current: T,
+    default: T,
+) -> T {
+    match recommendation {
+        Recommendation::Invalid(error) => {
+            warn!("Ignoring invalid {kind} recommendation for key {name}: {error}");
+            current
+        }
+        Recommendation::Missing => default,
+        Recommendation::Value(value) => value,
+    }
 }
 
 /// Processes the result of a keepalive request and updates its key's state.
 fn process_keepalive_result<C: Clock>(
     name: &str,
     mut key: ActiveKey,
-    result: io::Result<KeepAliveResult>,
-    default_period: Duration,
+    result: Result<KeepAliveResult, KeepAliveError>,
+    config: &Config,
     clock: &C,
 ) -> Option<ActiveKey> {
-    match result {
+    let period = match result {
         Ok(KeepAliveResult::Deleted) => {
             error!("Keepalive for key {name} failed: key was deleted");
             return None;
         }
 
-        Ok(KeepAliveResult::Refreshed(period)) => {
-            key.period = period.unwrap_or(default_period);
+        Ok(KeepAliveResult::Refreshed { refresh_period, retry_policy }) => {
+            key.normal_period = resolve_recommendation(
+                name,
+                "refresh period",
+                refresh_period,
+                key.normal_period,
+                config.default_key_refresh_period,
+            );
+            key.retry_policy = resolve_recommendation(
+                name,
+                "retry policy",
+                retry_policy,
+                key.retry_policy,
+                config.default_key_retry_policy,
+            );
+            key.retry_period = key.retry_policy.initial_period();
+            key.normal_period
         }
 
-        Err(error) => {
+        Err(KeepAliveError::NonTransient(error)) => {
             error!("Keepalive for key {name} failed: {error}");
+            key.normal_period
         }
-    }
 
-    key.next_due = clock.now() + key.period;
-    info!("Next keepalive for key {name} is due in {:?}", key.period);
+        Err(KeepAliveError::Transient(error)) => {
+            error!("Keepalive for key {name} failed: {error}");
+            let period = key.retry_period.min(key.normal_period);
+            key.retry_period =
+                key.retry_period.saturating_mul(2).min(key.retry_policy.max_period());
+            period
+        }
+    };
+
+    key.next_due = clock.now() + period;
+    info!("Next keepalive for key {name} is due in {period:?}");
     Some(key)
 }
 
@@ -141,8 +194,7 @@ where
     S: Service + Clone + Send + Sync + 'static,
     C: Clock,
 {
-    let default_period = config.default_key_refresh_period;
-    let mut ready_keys: HashMap<_, _> = select_keys(&config, names, default_period, clock)?;
+    let mut ready_keys: HashMap<_, _> = select_keys(&config, names, clock)?;
     let mut pending_keys = HashMap::new();
     let service = service?;
     let mut requests = JoinSet::new();
@@ -183,7 +235,7 @@ where
         if let Some(completed) = completed {
             let (name, result) = completed.expect("Keepalive request task unexpectedly failed");
             let key = pending_keys.remove(&name).expect("Completed key was not pending");
-            if let Some(key) = process_keepalive_result(&name, key, result, default_period, clock) {
+            if let Some(key) = process_keepalive_result(&name, key, result, &config, clock) {
                 ready_keys.insert(name, key);
             }
         }
@@ -208,9 +260,15 @@ mod testutils {
     use tokio::time::Instant;
 
     /// Clock that returns a predefined sequence of timestamps.
-    #[derive(Default)]
     pub(super) struct MockClock {
+        base: Instant,
         now: RefCell<VecDeque<Instant>>,
+    }
+
+    impl Default for MockClock {
+        fn default() -> Self {
+            Self::new(&[])
+        }
     }
 
     impl MockClock {
@@ -222,7 +280,12 @@ mod testutils {
                 now.push_back(base + Duration::from_secs(*offset));
             }
 
-            Self { now: RefCell::from(now) }
+            Self { base, now: RefCell::from(now) }
+        }
+
+        /// Returns the timestamp at `offset` from this clock's base.
+        pub(super) fn at(&self, offset: u64) -> Instant {
+            self.base + Duration::from_secs(offset)
         }
     }
 
@@ -269,6 +332,7 @@ mod tests {
             .collect::<HashMap<_, _>>();
         Config {
             default_key_refresh_period: default_period,
+            default_key_retry_policy: RetryPolicy::default(),
             keys,
             service_url: Url::parse("http://unused.example/").unwrap(),
             luks: HashMap::default(),
@@ -300,26 +364,56 @@ mod tests {
         service.add_keep_alive(
             KEY_ID_1,
             "password-1",
-            Ok(KeepAliveResult::Refreshed(Some(Duration::from_secs(10)))),
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(10)),
+                retry_policy: Recommendation::Missing,
+            }),
         );
         service.add_keep_alive(
             KEY_ID_2,
             "password-2",
-            Ok(KeepAliveResult::Refreshed(Some(Duration::from_secs(30)))),
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(30)),
+                retry_policy: Recommendation::Missing,
+            }),
         );
         service.add_keep_alive(
             KEY_ID_3,
             "password-3",
-            Ok(KeepAliveResult::Refreshed(Some(Duration::from_secs(20)))),
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(20)),
+                retry_policy: Recommendation::Missing,
+            }),
         );
-        service.add_keep_alive(KEY_ID_1, "password-1", Ok(KeepAliveResult::Refreshed(None)));
-        service.add_keep_alive(KEY_ID_1, "password-1", Err(io::Error::other("Injected error")));
+        service.add_keep_alive(
+            KEY_ID_1,
+            "password-1",
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Missing,
+                retry_policy: Recommendation::Missing,
+            }),
+        );
+        service.add_keep_alive(
+            KEY_ID_1,
+            "password-1",
+            Err(KeepAliveError::NonTransient(io::Error::other("Injected error"))),
+        );
         service.add_keep_alive(
             KEY_ID_2,
             "password-2",
-            Ok(KeepAliveResult::Refreshed(Some(Duration::from_secs(40)))),
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(40)),
+                retry_policy: Recommendation::Missing,
+            }),
         );
-        service.add_keep_alive(KEY_ID_3, "password-3", Ok(KeepAliveResult::Refreshed(None)));
+        service.add_keep_alive(
+            KEY_ID_3,
+            "password-3",
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Missing,
+                retry_policy: Recommendation::Missing,
+            }),
+        );
         service.add_keep_alive(KEY_ID_3, "password-3", Ok(KeepAliveResult::Deleted));
         service.add_keep_alive(KEY_ID_1, "password-1", Ok(KeepAliveResult::Deleted));
         service.add_keep_alive(KEY_ID_2, "password-2", Ok(KeepAliveResult::Deleted));
@@ -342,6 +436,227 @@ mod tests {
         keep_alive_internal(config, &["second".to_owned()], Ok(service.clone()), &clock)
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn test_invalid_recommendations_are_ignored() {
+        let config = make_config(&[("first", KEY_ID_1, "password-1")], Duration::from_secs(90));
+        let clock = MockClock::new(&[0, 1, 2, 3, 4]);
+        let mut key = select_keys(&config, &[], &clock).unwrap().remove("first").unwrap();
+        let service_policy =
+            RetryPolicy::new(Duration::from_secs(7), Duration::from_secs(14)).unwrap();
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(30)),
+                retry_policy: Recommendation::Value(service_policy),
+            }),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        key = process_keepalive_result(
+            "first",
+            key,
+            Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(40)),
+                retry_policy: Recommendation::Invalid(io::Error::other("Invalid retry policy")),
+            }),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(Duration::from_secs(40), key.normal_period);
+        assert_eq!(service_policy, key.retry_policy);
+        assert_eq!(service_policy.initial_period(), key.retry_period);
+        assert_eq!(clock.at(43), key.next_due);
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Invalid(io::Error::other("Invalid refresh period")),
+                retry_policy: Recommendation::Missing,
+            }),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(Duration::from_secs(40), key.normal_period);
+        assert_eq!(config.default_key_retry_policy, key.retry_policy);
+        assert_eq!(config.default_key_retry_policy.initial_period(), key.retry_period);
+        assert_eq!(clock.at(44), key.next_due);
+    }
+
+    #[test]
+    fn test_transient_failures_back_off_and_reset() {
+        let config = make_config(&[("first", KEY_ID_1, "password-1")], Duration::from_secs(90));
+        let clock = MockClock::new(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        let mut key = select_keys(&config, &[], &clock).unwrap().remove("first").unwrap();
+
+        for (now, delay) in [(1, 5), (2, 10), (3, 20), (4, 40), (5, 60), (6, 60)] {
+            key = process_keepalive_result(
+                "first",
+                key,
+                Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+                &config,
+                &clock,
+            )
+            .unwrap();
+            assert_eq!(clock.at(now + delay), key.next_due);
+        }
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Value(Duration::from_secs(30)),
+                retry_policy: Recommendation::Value(
+                    RetryPolicy::new(Duration::from_secs(7), Duration::from_secs(14)).unwrap(),
+                ),
+            }),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(37), key.next_due);
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(15), key.next_due);
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Ok(KeepAliveResult::Refreshed {
+                refresh_period: Recommendation::Missing,
+                retry_policy: Recommendation::Missing,
+            }),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(99), key.next_due);
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(15), key.next_due);
+    }
+
+    #[test]
+    fn test_transient_retry_does_not_exceed_normal_period() {
+        let config = make_config(&[("first", KEY_ID_1, "password-1")], Duration::from_secs(3));
+        let clock = MockClock::new(&[0, 1, 2]);
+        let mut key = select_keys(&config, &[], &clock).unwrap().remove("first").unwrap();
+
+        for now in [1, 2] {
+            key = process_keepalive_result(
+                "first",
+                key,
+                Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+                &config,
+                &clock,
+            )
+            .unwrap();
+            assert_eq!(clock.at(now + 3), key.next_due);
+        }
+    }
+
+    #[test]
+    fn test_non_transient_failure_retains_retry_policy() {
+        let config = make_config(&[("first", KEY_ID_1, "password-1")], Duration::from_secs(30));
+        let clock = MockClock::new(&[0, 1, 2, 3]);
+        let mut key = select_keys(&config, &[], &clock).unwrap().remove("first").unwrap();
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(6), key.next_due);
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Err(KeepAliveError::NonTransient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+
+        assert_eq!(clock.at(32), key.next_due);
+
+        key = process_keepalive_result(
+            "first",
+            key,
+            Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(13), key.next_due);
+    }
+
+    #[test]
+    fn test_transient_retry_state_is_per_key() {
+        let mut config = make_config(
+            &[("first", KEY_ID_1, "password-1"), ("second", KEY_ID_2, "password-2")],
+            Duration::from_secs(30),
+        );
+        config.default_key_retry_policy =
+            RetryPolicy::new(Duration::from_secs(6), Duration::from_secs(12)).unwrap();
+        let clock = MockClock::new(&[0, 1, 2, 3]);
+        let mut keys = select_keys(&config, &[], &clock).unwrap();
+        let mut first = keys.remove("first").unwrap();
+        let second = keys.remove("second").unwrap();
+
+        for (now, delay) in [(1, 6), (2, 12)] {
+            first = process_keepalive_result(
+                "first",
+                first,
+                Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+                &config,
+                &clock,
+            )
+            .unwrap();
+            assert_eq!(clock.at(now + delay), first.next_due);
+        }
+
+        let second = process_keepalive_result(
+            "second",
+            second,
+            Err(KeepAliveError::Transient(io::Error::other("Injected error"))),
+            &config,
+            &clock,
+        )
+        .unwrap();
+        assert_eq!(clock.at(9), second.next_due);
     }
 
     #[tokio::test]

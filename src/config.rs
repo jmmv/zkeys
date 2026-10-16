@@ -46,6 +46,16 @@ fn default_key_refresh_period() -> Duration {
     Duration::from_secs(300)
 }
 
+/// Returns the default initial delay between retries.
+fn default_key_retry_initial_period() -> Duration {
+    Duration::from_secs(5)
+}
+
+/// Returns the default maximum delay between retries.
+fn default_key_retry_max_period() -> Duration {
+    Duration::from_secs(60)
+}
+
 /// Deserializes a human-readable duration.
 fn deserialize_duration<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Duration, D::Error> {
     let raw = String::deserialize(deserializer)?;
@@ -74,6 +84,84 @@ pub struct LuksVolume {
     pub key: String,
 }
 
+#[derive(Deserialize)]
+struct UnvalidatedRetryPolicy {
+    #[serde(
+        default = "default_key_retry_initial_period",
+        deserialize_with = "deserialize_duration",
+        rename = "default_key_retry_initial_period"
+    )]
+    initial_period: Duration,
+
+    #[serde(
+        default = "default_key_retry_max_period",
+        deserialize_with = "deserialize_duration",
+        rename = "default_key_retry_max_period"
+    )]
+    max_period: Duration,
+}
+
+/// Policy for retrying transient keep-alive failures.
+#[derive(Clone, Copy, Deserialize)]
+#[cfg_attr(test, derive(Debug, Eq, PartialEq))]
+#[serde(try_from = "UnvalidatedRetryPolicy")]
+pub struct RetryPolicy {
+    /// Initial delay between retries.
+    initial_period: Duration,
+
+    /// Maximum delay between retries.
+    max_period: Duration,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self::new(default_key_retry_initial_period(), default_key_retry_max_period()).unwrap()
+    }
+}
+
+impl RetryPolicy {
+    /// Creates a retry policy with the given initial and maximum delays.
+    pub fn new(initial_period: Duration, max_period: Duration) -> io::Result<Self> {
+        if initial_period.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Initial retry period must be greater than zero",
+            ));
+        }
+        if max_period.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Maximum retry period must be greater than zero",
+            ));
+        }
+        if initial_period > max_period {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Initial retry period cannot exceed maximum retry period",
+            ));
+        }
+        Ok(Self { initial_period, max_period })
+    }
+
+    /// Returns the initial delay between retries.
+    pub fn initial_period(&self) -> Duration {
+        self.initial_period
+    }
+
+    /// Returns the maximum delay between retries.
+    pub fn max_period(&self) -> Duration {
+        self.max_period
+    }
+}
+
+impl TryFrom<UnvalidatedRetryPolicy> for RetryPolicy {
+    type Error = io::Error;
+
+    fn try_from(policy: UnvalidatedRetryPolicy) -> io::Result<Self> {
+        Self::new(policy.initial_period, policy.max_period)
+    }
+}
+
 /// Describes the key associated with a ZFS dataset.
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
@@ -89,6 +177,10 @@ pub struct Config {
     /// Interval to use when the service does not provide one.
     #[serde(default = "default_key_refresh_period", deserialize_with = "deserialize_duration")]
     pub default_key_refresh_period: Duration,
+
+    /// Retry policy to use when the service does not provide one.
+    #[serde(flatten)]
+    pub default_key_retry_policy: RetryPolicy,
 
     /// Base URL of the zkeys service.
     #[serde(default = "default_service_url")]
@@ -185,6 +277,7 @@ mod tests {
                 service_url: Url::parse("https://zkeys.jmmv.dev/").unwrap(),
                 keys: HashMap::default(),
                 default_key_refresh_period: default_key_refresh_period(),
+                default_key_retry_policy: RetryPolicy::default(),
                 luks: HashMap::default(),
                 zfs: HashMap::default(),
             },
@@ -226,6 +319,8 @@ mod tests {
             r#"
 service_url = "https://example.com/api/"
 default_key_refresh_period = "2d"
+default_key_retry_initial_period = "10s"
+default_key_retry_max_period = "2m"
 
 [keys.first]
 id = "{KEY_ID_1}"
@@ -253,12 +348,39 @@ key = "second"
             Config {
                 service_url: Url::parse("https://example.com/api/").unwrap(),
                 default_key_refresh_period: Duration::from_secs(2 * 24 * 60 * 60),
+                default_key_retry_policy: RetryPolicy::new(
+                    Duration::from_secs(10),
+                    Duration::from_secs(120),
+                )
+                .unwrap(),
                 keys,
                 luks,
                 zfs,
             },
             config
         );
+    }
+
+    #[test]
+    fn test_parse_from_str_rejects_invalid_retry_periods() {
+        for (configuration, message) in [
+            (
+                "default_key_retry_initial_period = \"0s\"",
+                "Initial retry period must be greater than zero",
+            ),
+            (
+                "default_key_retry_max_period = \"0s\"",
+                "Maximum retry period must be greater than zero",
+            ),
+            (
+                "default_key_retry_initial_period = \"2m\"\ndefault_key_retry_max_period = \"1m\"",
+                "Initial retry period cannot exceed maximum retry period",
+            ),
+        ] {
+            let error = Config::parse_from_str(configuration).unwrap_err();
+            assert_eq!(io::ErrorKind::InvalidData, error.kind());
+            assert!(error.to_string().contains(message));
+        }
     }
 
     #[test]

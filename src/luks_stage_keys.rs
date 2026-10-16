@@ -95,7 +95,7 @@ pub async fn luks_stage_keys(config: Config, output_dir: &Path) -> io::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Key, LuksVolume};
+    use crate::config::{Key, LuksVolume, RetryPolicy};
     use crate::service::KeySecret;
     use crate::service::testutils::MockService;
     use std::collections::HashMap;
@@ -141,6 +141,7 @@ mod tests {
 
         Config {
             default_key_refresh_period: Duration::from_secs(300),
+            default_key_retry_policy: RetryPolicy::default(),
             keys,
             luks,
             service_url: Url::parse("http://unused.example/").unwrap(),

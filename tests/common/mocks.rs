@@ -42,6 +42,8 @@ use uuid::Uuid;
 
 /// Header that reports the recommended period between keepalive requests.
 const REFRESH_PERIOD_HEADER: &str = "X-Key-Refresh-Period-Seconds";
+const RETRY_INITIAL_PERIOD_HEADER: &str = "X-Key-Retry-Initial-Period-Seconds";
+const RETRY_MAX_PERIOD_HEADER: &str = "X-Key-Retry-Max-Period-Seconds";
 
 /// Refresh period used by successful mock secret responses.
 const DEFAULT_REFRESH_PERIOD: &str = "300";
@@ -70,6 +72,12 @@ pub(crate) struct KeepAliveResponse {
 
     /// Optional refresh-period header value.
     pub(crate) refresh_period: Option<&'static str>,
+
+    /// Optional initial retry-period header value.
+    pub(crate) retry_initial_period: Option<&'static str>,
+
+    /// Optional maximum retry-period header value.
+    pub(crate) retry_max_period: Option<&'static str>,
 
     /// HTTP status code.
     pub(crate) status: StatusCode,
@@ -120,6 +128,17 @@ async fn keep_alive(
         response
             .headers_mut()
             .insert(REFRESH_PERIOD_HEADER, HeaderValue::from_str(refresh_period).unwrap());
+    }
+    if let Some(retry_initial_period) = specification.retry_initial_period {
+        response.headers_mut().insert(
+            RETRY_INITIAL_PERIOD_HEADER,
+            HeaderValue::from_str(retry_initial_period).unwrap(),
+        );
+    }
+    if let Some(retry_max_period) = specification.retry_max_period {
+        response
+            .headers_mut()
+            .insert(RETRY_MAX_PERIOD_HEADER, HeaderValue::from_str(retry_max_period).unwrap());
     }
     response
 }

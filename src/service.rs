@@ -26,12 +26,18 @@
 
 //! REST client for the zkeys service.
 
+use crate::config::RetryPolicy;
 use reqwest::StatusCode;
 use std::future::Future;
 use std::io;
 use std::time::Duration;
+use thiserror::Error;
 use url::Url;
 use uuid::Uuid;
+
+const REFRESH_PERIOD_HEADER: &str = "X-Key-Refresh-Period-Seconds";
+const RETRY_INITIAL_PERIOD_HEADER: &str = "X-Key-Retry-Initial-Period-Seconds";
+const RETRY_MAX_PERIOD_HEADER: &str = "X-Key-Retry-Max-Period-Seconds";
 
 /// Converts a `reqwest::Error` to an `io::Error`.
 fn reqwest_error_to_io_error(mut e: reqwest::Error) -> io::Error {
@@ -53,8 +59,35 @@ pub(crate) enum KeepAliveResult {
     /// The key no longer exists in the service.
     Deleted,
 
-    /// The key was refreshed, with an optional recommended refresh period.
-    Refreshed(Option<Duration>),
+    /// The key was refreshed, with recommendations for future requests.
+    Refreshed {
+        refresh_period: Recommendation<Duration>,
+        retry_policy: Recommendation<RetryPolicy>,
+    },
+}
+
+/// Recommendation from a successful keep-alive request.
+pub(crate) enum Recommendation<T> {
+    /// The service provided an invalid recommendation.
+    Invalid(io::Error),
+
+    /// The service did not provide a recommendation.
+    Missing,
+
+    /// The service provided a valid recommendation.
+    Value(T),
+}
+
+/// Error returned by a keep-alive request.
+#[derive(Debug, Error)]
+pub(crate) enum KeepAliveError {
+    /// A failure that should be retried at the normal refresh period.
+    #[error(transparent)]
+    NonTransient(io::Error),
+
+    /// A failure that should be retried sooner than the normal refresh period.
+    #[error(transparent)]
+    Transient(io::Error),
 }
 
 /// Interface to the zkeys service.
@@ -67,7 +100,7 @@ pub(crate) trait Service {
         &self,
         key_id: Uuid,
         password: &str,
-    ) -> impl Future<Output = io::Result<KeepAliveResult>> + Send;
+    ) -> impl Future<Output = Result<KeepAliveResult, KeepAliveError>> + Send;
 }
 
 /// HTTP client for the zkeys service.
@@ -101,6 +134,59 @@ impl HttpService {
         url.set_path(path);
         url
     }
+
+    /// Parses a duration in seconds from `name`, if present.
+    fn parse_period_header(
+        headers: &reqwest::header::HeaderMap,
+        name: &str,
+    ) -> Recommendation<Duration> {
+        let Some(value) = headers.get(name) else {
+            return Recommendation::Missing;
+        };
+        let value = match value.to_str() {
+            Ok(value) => value,
+            Err(error) => {
+                return Recommendation::Invalid(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid {name} header: {error}"),
+                ));
+            }
+        };
+        match value.parse::<u64>() {
+            Ok(seconds) => Recommendation::Value(Duration::from_secs(seconds)),
+            Err(error) => Recommendation::Invalid(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid {name} header {value:?}: {error}"),
+            )),
+        }
+    }
+
+    /// Parses and validates the optional retry policy headers.
+    fn parse_retry_policy(headers: &reqwest::header::HeaderMap) -> Recommendation<RetryPolicy> {
+        let initial_period = Self::parse_period_header(headers, RETRY_INITIAL_PERIOD_HEADER);
+        let max_period = Self::parse_period_header(headers, RETRY_MAX_PERIOD_HEADER);
+        let (initial_period, max_period) = match (initial_period, max_period) {
+            (Recommendation::Invalid(error), _) | (_, Recommendation::Invalid(error)) => {
+                return Recommendation::Invalid(error);
+            }
+            (Recommendation::Missing, Recommendation::Missing) => {
+                return Recommendation::Missing;
+            }
+            (Recommendation::Value(initial_period), Recommendation::Value(max_period)) => {
+                (initial_period, max_period)
+            }
+            _ => {
+                return Recommendation::Invalid(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Service returned an incomplete key retry policy",
+                ));
+            }
+        };
+        match RetryPolicy::new(initial_period, max_period) {
+            Ok(policy) => Recommendation::Value(policy),
+            Err(error) => Recommendation::Invalid(error),
+        }
+    }
 }
 
 impl Service for HttpService {
@@ -127,14 +213,19 @@ impl Service for HttpService {
         Ok(KeySecret { secret })
     }
 
-    async fn keep_alive(&self, key_id: Uuid, password: &str) -> io::Result<KeepAliveResult> {
+    async fn keep_alive(
+        &self,
+        key_id: Uuid,
+        password: &str,
+    ) -> Result<KeepAliveResult, KeepAliveError> {
         let response = self
             .client
             .get(self.make_url(&format!("api/v1/keys/{}/keepalive", key_id)))
             .query(&[("password", password)])
             .send()
             .await
-            .map_err(reqwest_error_to_io_error)?;
+            .map_err(reqwest_error_to_io_error)
+            .map_err(KeepAliveError::Transient)?;
 
         if response.status() == StatusCode::NOT_FOUND {
             return Ok(KeepAliveResult::Deleted);
@@ -142,40 +233,32 @@ impl Service for HttpService {
 
         if response.status() != StatusCode::OK {
             let status = response.status();
-            let text = response.text().await.map_err(reqwest_error_to_io_error)?;
-            return Err(io::Error::new(
+            let text = response
+                .text()
+                .await
+                .map_err(reqwest_error_to_io_error)
+                .map_err(KeepAliveError::Transient)?;
+            let error = io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("Service returned HTTP {}: {}", status, text),
-            ));
+            );
+            return if status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error() {
+                Err(KeepAliveError::Transient(error))
+            } else {
+                Err(KeepAliveError::NonTransient(error))
+            };
         }
 
-        let refresh_period = response
-            .headers()
-            .get("X-Key-Refresh-Period-Seconds")
-            .map(|value| -> io::Result<Duration> {
-                let value = value.to_str().map_err(|error| {
-                    io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid key refresh period header: {error}"),
-                    )
-                })?;
-                let seconds = value.parse::<u64>().map_err(|error| {
-                    io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid key refresh period header {value:?}: {error}"),
-                    )
-                })?;
-                Ok(Duration::from_secs(seconds))
-            })
-            .transpose()?;
+        let refresh_period = Self::parse_period_header(response.headers(), REFRESH_PERIOD_HEADER);
+        let retry_policy = Self::parse_retry_policy(response.headers());
 
-        Ok(KeepAliveResult::Refreshed(refresh_period))
+        Ok(KeepAliveResult::Refreshed { refresh_period, retry_policy })
     }
 }
 
 #[cfg(test)]
 pub(crate) mod testutils {
-    use super::{KeepAliveResult, KeySecret, Service};
+    use super::{KeepAliveError, KeepAliveResult, KeySecret, Service};
     use std::collections::VecDeque;
     use std::io;
     use std::sync::{Arc, Mutex};
@@ -183,7 +266,7 @@ pub(crate) mod testutils {
 
     /// Mapping of a `get_key` request to the mock response.
     type GetKeySecretMock = ((Uuid, String), io::Result<KeySecret>);
-    type KeepAliveMock = ((Uuid, String), io::Result<KeepAliveResult>);
+    type KeepAliveMock = ((Uuid, String), Result<KeepAliveResult, KeepAliveError>);
 
     /// Shared state for a mock service.
     #[derive(Default)]
@@ -231,7 +314,7 @@ pub(crate) mod testutils {
             &mut self,
             key_id: Uuid,
             password: &str,
-            result: io::Result<KeepAliveResult>,
+            result: Result<KeepAliveResult, KeepAliveError>,
         ) {
             self.state
                 .keep_alive
@@ -255,7 +338,11 @@ pub(crate) mod testutils {
             mock.1
         }
 
-        async fn keep_alive(&self, key_id: Uuid, password: &str) -> io::Result<KeepAliveResult> {
+        async fn keep_alive(
+            &self,
+            key_id: Uuid,
+            password: &str,
+        ) -> Result<KeepAliveResult, KeepAliveError> {
             let mut mocks = self.state.keep_alive.lock().unwrap();
             let position = mocks
                 .iter()
