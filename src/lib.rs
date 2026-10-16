@@ -27,7 +27,7 @@
 //! Command-line interface for the ZKeys service.
 
 mod config;
-pub use config::Config;
+pub use config::{Config, RetryPolicy};
 mod get_key;
 pub use get_key::get_key;
 mod keep_alive;

@@ -23,7 +23,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd October 6, 2026
+.Dd October 16, 2026
 .Dt ZKEYS 8
 .Os
 .Sh NAME
@@ -157,12 +157,30 @@ If no names are given, the command operates on all configured keys.
 .Pp
 Each key is first refreshed immediately and, during the process, the server
 returns a recommended refresh period for subsequent requests.
-If the service does not provide a refresh period or the keep-alive ping
-fails, the value of
+If the service does not provide a refresh period, the value of
 .Va default_key_refresh_period
 from
 .Xr zkeys.toml 5
 is used.
+If the service provides an invalid refresh period, the current period remains
+in effect.
+The service can also return an initial and maximum retry period.
+If it returns neither, the values of
+.Va default_key_retry_initial_period
+and
+.Va default_key_retry_max_period
+from
+.Xr zkeys.toml 5
+are used.
+The service must return both values and they must form a valid policy;
+otherwise, the current policy remains in effect.
+Transient failures, including network errors, rate limiting, and server
+errors, are retried with an exponential delay starting at the initial retry
+period and capped at the maximum retry period or the normal refresh period,
+whichever is shorter.
+This is to prevent keys being auto-locked just because we failed to send a
+single keepalive message.
+Other failures are retried at the normal refresh period.
 .Pp
 The following options are supported:
 .Bl -tag -width XXXX

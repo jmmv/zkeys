@@ -23,7 +23,7 @@
 .\" THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 .\" OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.Dd October 6, 2026
+.Dd October 16, 2026
 .Dt ZKEYS.TOML 5
 .Os
 .Sh NAME
@@ -43,6 +43,8 @@ The following example shows a typical configuration file:
 .Bd -literal -offset indent
 service_url = "https://zkeys.jmmv.dev/"
 default_key_refresh_period = "5m"
+default_key_retry_initial_period = "5s"
+default_key_retry_max_period = "1m"
 
 [keys.sample]
 id = "01234567-89ab-cdef-0123-4567890abcde"
@@ -63,7 +65,7 @@ Restrict read access to the file to the account that runs
 .Ss Top-level settings
 .Bl -tag -width XXXX
 .It Va default_key_refresh_period
-Refresh period to use as fallback when teh service fails to provide a recommended
+Refresh period to use as fallback when the service fails to provide a recommended
 period for a key.
 Durations are specified as a number followed by a unit, such as
 .Dq 30s ,
@@ -73,6 +75,25 @@ or
 .Pp
 Default:
 5m.
+.It Va default_key_retry_initial_period
+Initial delay between retries of transient keep-alive failures when the service
+does not provide a retry policy.
+The value must be greater than zero and cannot exceed
+.Va default_key_retry_max_period .
+Durations use the same syntax as
+.Va default_key_refresh_period .
+.Pp
+Default:
+5s.
+.It Va default_key_retry_max_period
+Maximum delay between retries of transient keep-alive failures when the service
+does not provide a retry policy.
+The value must be greater than zero.
+Durations use the same syntax as
+.Va default_key_refresh_period .
+.Pp
+Default:
+1m.
 .It Va service_url
 URL of the zkeys service.
 The URL must not contain a path.
