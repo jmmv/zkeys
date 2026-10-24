@@ -29,9 +29,13 @@ Description=Stage ZKeys LUKS keys
 DefaultDependencies=no
 Wants=network-online.target
 After=network-online.target
+ConditionPathExists=/etc/initrd-release
 ConditionPathExists=/etc/zkeys.toml
+Conflicts=initrd-switch-root.target
+Before=initrd-switch-root.target
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/sbin/zkeys luks-stage-keys --config-file /etc/zkeys.toml
 TimeoutStartSec=30s
