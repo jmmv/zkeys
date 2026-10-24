@@ -50,4 +50,27 @@ install() {
     inst_dir "$systemdsystemunitdir/systemd-cryptsetup@.service.d"
     inst_simple "$moddir/zkeys-cryptsetup.conf" \
         "$systemdsystemunitdir/systemd-cryptsetup@.service.d/zkeys.conf"
+
+    # Cryptsetup units survive isolation and can retain our networking
+    # dependencies.  Stop the initrd network manager and close its D-Bus
+    # socket before switching root, so the host starts a fresh bus after
+    # loading its SELinux policy.  Reset network-online.target too, so host
+    # consumers wait for the host's network configuration and DNS to be ready.
+    # Keep these overrides in the initramfs.
+    local unit
+    for unit in \
+        nm-initrd.service \
+        network-online.target \
+        dbus.service \
+        dbus-broker.service \
+        dbus.socket
+    do
+        [[ -e "$initdir$systemdsystemunitdir/$unit" ]] || continue
+        inst_dir "$systemdsystemunitdir/$unit.d"
+        cat >"$initdir$systemdsystemunitdir/$unit.d/zkeys-handoff.conf" <<'EOF'
+[Unit]
+Conflicts=initrd-switch-root.target
+Before=initrd-switch-root.target
+EOF
+    done
 }
