@@ -1,7 +1,6 @@
 [package]
 name = "zkeys"
-version = "0.0.0"
-publish = false
+version = "0.1.0"
 license = "BSD-2-Clause"
 authors = ["Julio Merino <julio@meroh.net>"]
 categories = ["command-line-utilities"]

@@ -1,7 +1,7 @@
 # Major changes between releases
 
-## Changes in version 0.0.0
+## Changes in version 0.1.0
 
-**NOT RELEASED YET; STILL UNDER DEVELOPMENT.**
+**Released on 2026-11-01.**
 
 *   First public release.
