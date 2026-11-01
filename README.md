@@ -20,7 +20,7 @@ support for systems such as Fedora.
 
 Visit <https://zkeys.jmmv.dev/> for more details on the product.
 
-**The latest version of ZKeys is 0.0.0 and was released on 2026-10-01.**
+**The latest version of ZKeys is 0.1.0 and was released on 2026-11-01.**
 
 See the [release notes](NEWS.md) for information about the changes in this and
 all previous releases.
@@ -30,7 +30,7 @@ all previous releases.
 ### From a release archive (preferred)
 
 Visit the
-[release page](https://github.com/jmmv/zkeys/releases/tag/zkeys-0.0.0)
+[release page](https://github.com/jmmv/zkeys/releases/tag/zkeys-0.1.0)
 to download the source archive.  Once downloaded, unpack it, install a Rust
 toolchain and GNU Make, and then run:
 
