@@ -1,6 +1,7 @@
 #! /bin/sh
 
 is=
+is="${is} RUSTSEC-2026-0542"  # humantime is unmaintained
 
 args="-D warnings"
 for i in ${is}; do
