@@ -45,6 +45,7 @@ rust_deps = \
 
 EXTRA_DIST = \
 	RELEASE.md \
+	admin/check-dependencies.sh \
 	admin/check-install.sh \
 	admin/check-rust-sources.sh \
 	admin/merge-mtree.awk \
